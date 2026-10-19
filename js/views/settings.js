@@ -400,7 +400,7 @@ export function viewWelcome() {
   const stepHello = () => {
     clearChildren(body);
     body.append(
-      h("img.welcome-icon", { src: "icons/icon-192.png", alt: "" }),
+      h("img.mascot.welcome-mascot", { src: "img/mascot.png", alt: "" }),
       h("h1", "Welcome to Family Menu!"),
       h("p.big-text", "Our dishes, our recipes, and what's for dinner this week."),
       h("button.btn.primary.big.wide", { onclick: stepFamily }, "Let's set up ▶"),

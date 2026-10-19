@@ -726,9 +726,9 @@ body:has(.sheet) .toast { bottom: auto; top: calc(16px + env(safe-area-inset-top
   text-decoration: none; color: var(--muted); font-weight: 900; font-size: 15px; border-radius: 20px; margin: 2px 4px;
 }
 
-.tab-emoji { font-size: 30px; line-height: 1; transition: transform 0.15s; }
+.tab-icon { display: block; width: 32px; height: 32px; background: center / contain no-repeat; transition: transform 0.15s; }
 .tabbar a.on { color: var(--ink); background: var(--primary-soft); }
-.tabbar a.on .tab-emoji { transform: scale(1.12); }
+.tabbar a.on .tab-icon { transform: scale(1.12); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -1007,3 +1007,20 @@ details.more > .stack { margin-top: 10px; }
 }
 /* Long dish names wrap instead of running off the card. */
 .list-for .chip { white-space: normal; max-width: 100%; text-align: left; height: auto; min-height: 44px; }
+
+/* ---------- Canva icons ---------- */
+
+.tabbar a[data-tab=today] .tab-icon { background-image: url("img/tab-today.png"); }
+.tabbar a[data-tab=week] .tab-icon { background-image: url("img/tab-week.png"); }
+.tabbar a[data-tab=menu] .tab-icon { background-image: url("img/tab-menu.png"); }
+.tabbar a[data-tab=shop] .tab-icon { background-image: url("img/tab-shop.png"); }
+.tabbar a.on[data-tab=today] .tab-icon { background-image: url("img/tab-today-on.png"); }
+.tabbar a.on[data-tab=week] .tab-icon { background-image: url("img/tab-week-on.png"); }
+.tabbar a.on[data-tab=menu] .tab-icon { background-image: url("img/tab-menu-on.png"); }
+.tabbar a.on[data-tab=shop] .tab-icon { background-image: url("img/tab-shop-on.png"); }
+.inline-icon { width: 1.15em; height: 1.15em; vertical-align: -0.2em; }
+.btn-icon { width: 36px; height: 36px; flex: none; }
+.mascot { display: block; width: 120px; height: 120px; margin: 0 auto; object-fit: contain; }
+.mascot.small { width: 72px; height: 72px; margin: 0; flex: none; }
+.welcome-mascot { width: 150px; height: 150px; }
+.brave-intro { align-items: center; gap: 12px; }

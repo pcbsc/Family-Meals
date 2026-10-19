@@ -185,7 +185,7 @@ export function viewToday() {
   const upNext = meals.find((m) => m.key === (hour < 10 ? "breakfast" : hour < 14 ? "lunch" : "dinner")) || meals[0];
   return h("div.screen.today",
     h("header.top",
-      h("div", h("h1", `${hello}! 👋`), h("p.muted.date", prettyDate(now))),
+      h("div", h("h1", `${hello}! `, h("img.inline-icon", { src: hour < 11 ? "img/sun.png" : "img/wave.png", alt: "" })), h("p.muted.date", prettyDate(now))),
       h("button.icon-btn.gear", { "aria-label": "Settings (grown-ups)", onclick: () => go("#/settings") }, "⚙️"),
     ),
     kidChoices(now),
@@ -194,7 +194,7 @@ export function viewToday() {
       mealCard(now, upNext),
       h("div.meal-rows", meals.filter((m) => m !== upNext).map((m) => mealRow(now, m))),
     ),
-    h("button.btn.big.wish.wide", { onclick: () => wishFlow() }, "🙋 I want to eat…"),
+    h("button.btn.big.wish.wide", { onclick: () => wishFlow() }, h("img.btn-icon", { src: "img/hand-up.png", alt: "" }), "I want to eat…"),
     braveBites(),
     grownUpBanners(),
   );

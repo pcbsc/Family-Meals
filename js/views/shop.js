@@ -247,7 +247,7 @@ export function viewShop({ params, setCleanup }) {
 
     if (!member && !mine.planned.length && !mine.added.length && !list.extras.length) {
       body.append(h("div.empty-state",
-        h("div.huge-emoji", "🪄"),
+        h("img.mascot", { src: "img/mascot.png", alt: "" }),
         h("p", "Plan some meals, or tap \"Add to shopping list\" on a recipe, and the list makes itself!"),
         h("button.btn.primary", { onclick: () => go(`#/week?w=${weekKey}`) }, "📅 Plan the week"),
       ));

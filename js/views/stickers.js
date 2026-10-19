@@ -47,7 +47,10 @@ export function viewStickers() {
   const kids = members().filter((m) => m.kid);
   return h("div.screen.stickers",
     backHeader("🏅 Brave Bites", { back: "#/today" }),
-    h("p.big-text", "Try a food and rate it with your face. You get a sticker for every new one!"),
+    h("div.row.brave-intro",
+      h("img.mascot.small", { src: "img/mascot.png", alt: "" }),
+      h("p.big-text.grow", "Try a food and rate it with your face. You get a sticker for every new one!"),
+    ),
     kids.length
       ? kids.map(kidCard)
       : h("div.empty-state", h("div.huge-emoji", "🧒"), h("p", "Mark your kids as 🧒 Kid in Settings and their sticker charts show up here."),

@@ -1,7 +1,7 @@
 // Service worker: keeps the app working without internet, and receives
 // recipes shared from other apps (Android's Share menu → Family Menu).
 // Bump VERSION when the list of app files changes.
-const VERSION = "v4";
+const VERSION = "v5";
 const APP_CACHE = `family-menu-app-${VERSION}`;
 const IMAGE_CACHE = "family-menu-images";
 
@@ -36,6 +36,18 @@ const APP_FILES = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/favicon-32.png",
+  "./img/tab-today.png",
+  "./img/tab-today-on.png",
+  "./img/tab-week.png",
+  "./img/tab-week-on.png",
+  "./img/tab-menu.png",
+  "./img/tab-menu-on.png",
+  "./img/tab-shop.png",
+  "./img/tab-shop-on.png",
+  "./img/wave.png",
+  "./img/sun.png",
+  "./img/hand-up.png",
+  "./img/mascot.png",
 ];
 
 self.addEventListener("install", (event) => {
