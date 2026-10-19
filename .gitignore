@@ -1,0 +1,4 @@
+node_modules/
+tests/failure-*.png
+.DS_Store
+Thumbs.db
