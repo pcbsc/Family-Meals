@@ -2,7 +2,7 @@
 // plan a week of meals. Calls go straight from this device to the Claude API
 // with the family's own key (saved only on this device).
 import Anthropic from "../vendor/anthropic-sdk.mjs";
-import { MEALS, CATEGORIES } from "./seed.js";
+import { MEALS, CATEGORIES, CUISINES } from "./seed.js";
 import { cleanLink } from "./recipe.js";
 import { videoInfo, videoSeenIn } from "./video.js";
 
@@ -13,6 +13,7 @@ const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 const MEAL_KEYS = MEALS.map((m) => m.key);
 const CATEGORY_KEYS = CATEGORIES.map((c) => c.key);
+const CUISINE_KEYS = CUISINES.map((c) => c.key);
 
 export class FriendlyError extends Error {}
 
@@ -31,6 +32,7 @@ const RECIPE_SCHEMA = {
     description: { type: "string", description: "One short, appetizing sentence a child would understand." },
     meals: { type: "array", items: { type: "string", enum: MEAL_KEYS }, description: "Which meals it suits." },
     categories: { type: "array", items: { type: "string", enum: CATEGORY_KEYS } },
+    cuisine: { type: "string", enum: CUISINE_KEYS, description: "Where the dish is from. Use \"other\" if none fits." },
     servings: { type: "integer", description: "How many people the quantities feed." },
     prepMinutes: { type: "integer" },
     cookMinutes: { type: "integer" },
@@ -58,7 +60,7 @@ const RECIPE_SCHEMA = {
     },
   },
   required: [
-    "name", "nameKo", "emoji", "description", "meals", "categories", "servings", "prepMinutes",
+    "name", "nameKo", "emoji", "description", "meals", "categories", "cuisine", "servings", "prepMinutes",
     "cookMinutes", "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl", "videoUrl",
   ],
   additionalProperties: false,
@@ -266,6 +268,7 @@ export function cleanRecipe(r) {
     description: str(r.description, 300),
     meals: (Array.isArray(r.meals) ? r.meals : []).filter((m) => MEAL_KEYS.includes(m)),
     categories: (Array.isArray(r.categories) ? r.categories : []).filter((c) => CATEGORY_KEYS.includes(c)),
+    cuisine: CUISINE_KEYS.includes(r.cuisine) ? r.cuisine : "",
     servings: int(r.servings, 4, 50) || 4,
     prepMinutes: int(r.prepMinutes, 0, 24 * 60),
     cookMinutes: int(r.cookMinutes, 0, 24 * 60),
@@ -295,7 +298,7 @@ How to work:
 - Keep the original amounts and units. Don't invent ingredients the recipe doesn't use.
 - Write the steps in your own words, short and simple, one action each, so a 7-year-old helper can follow along with a grown-up.
 - Fill in the Korean name in Hangul for Korean dishes.
-- Set videoUrl so the family can watch while they cook: the post itself if it's a video, otherwise the creator's own video of this recipe if the page embeds or links one. For a short TikTok link (vm.tiktok.com/…), give the full tiktok.com/@account/video/<number> link it leads to. Only use a link that appears in what you were given or read; never make one up.
+- Set videoUrl so the family can watch while they cook: the post itself if it's a video, otherwise the creator's own video of this recipe if the page embeds or links one. For a short TikTok link (vm.tiktok.com/…), give the full tiktok.com/@account/video/<number> link it leads to. If there's no Instagram or TikTok video, do one web_search for a YouTube video of this recipe (the creator's own, or else a well-known cook's) and use the best result. Only use a link that appears in what you were given or read; never make one up.
 - If there's truly nothing recipe-like (for example a private or deleted post), call save_recipe with found=false, a short friendly problem, and empty placeholders in the recipe.
 
 Finish by calling save_recipe exactly once.`;
@@ -435,7 +438,7 @@ const SAVE_VIDEO_TOOL = {
 
 const VIDEO_SYSTEM = `You find one cooking video for a dish in a family's recipe app, so the family (including young kids) can watch how it's made while they cook.
 
-- Use web_search to look for videos of this dish. Prefer YouTube; TikTok or an Instagram reel is fine.
+- Use web_search to look for videos of this dish. If the recipe's creator has an Instagram reel or TikTok of it, use that; otherwise find a YouTube video.
 - Pick a video that clearly shows how to make this dish, is kid-appropriate, and matches the recipe's style (for example, not a much spicier version). Prefer well-known cooks: for Korean food Seonkyoung Longest, Maangchi, Aaron and Claire, Korean Bapsang or My Korean Kitchen; for other food, trusted family cooks and recipe channels.
 - Only use a link that appeared in your search results. Never make up or guess a video link.
 - Finish by calling save_video exactly once.`;

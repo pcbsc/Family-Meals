@@ -282,7 +282,7 @@ export function viewWelcome() {
     };
     body.append(
       h("h1", "Start with some dishes?"),
-      h("p.big-text", `We have ${STARTER_DISHES.length} family recipes ready: ${korean} healthy Korean favorites (bulgogi, japchae, tteokguk, gyeran jjim…), American family dinners like mac & cheese and chili, and trending TikTok dishes with their videos.`),
+      h("p.big-text", `We have ${STARTER_DISHES.length} family recipes ready, most with a cooking video: ${korean} healthy Korean favorites (bulgogi, japchae, tteokguk…), plus American, Italian, Mexican, Chinese, Japanese, Indian, Thai and Mediterranean dishes kids love.`),
       h("button.btn.primary.big.wide", { onclick: () => finish(true) }, "✅ Yes, add them"),
       h("button.btn.ghost.wide", { onclick: () => finish(false) }, "No thanks, we'll add our own"),
     );

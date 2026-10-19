@@ -27,6 +27,20 @@ export const CATEGORIES = [
   { key: "treat", label: "Treats", emoji: "🧁" },
 ];
 
+// Kinds of food, for the Menu's filter. The flags read well for kids.
+export const CUISINES = [
+  { key: "korean", label: "Korean", emoji: "🇰🇷" },
+  { key: "american", label: "American", emoji: "🇺🇸" },
+  { key: "italian", label: "Italian", emoji: "🇮🇹" },
+  { key: "mexican", label: "Mexican", emoji: "🇲🇽" },
+  { key: "chinese", label: "Chinese", emoji: "🇨🇳" },
+  { key: "japanese", label: "Japanese", emoji: "🇯🇵" },
+  { key: "indian", label: "Indian", emoji: "🇮🇳" },
+  { key: "thai", label: "Thai", emoji: "🇹🇭" },
+  { key: "mediterranean", label: "Mediterranean", emoji: "🫒" },
+  { key: "other", label: "Other", emoji: "🌍" },
+];
+
 export const SPICE = ["Not spicy", "A little spicy", "Spicy"];
 
 export const FACES = [
@@ -412,8 +426,309 @@ const MORE_STARTERS = [
     "The original 'TikTok pasta'. The Kitchn, Time Out and student taste-testers made it and said it lives up to the hype."),
 ];
 
-// The creators' own videos for the trending dishes (our recipes are home versions of theirs).
+// Added later (batch 3): family favorites from more kinds of food.
+const world = (cuisine, dishes) => dishes.map((dish) => ({ ...dish, cuisine }));
+const WORLD_STARTERS = [
+  ...world("italian", [
+    d("meatballs-marinara", "Baked Meatballs in Marinara", "", "🍝", ["dinner"], ["meat", "noodles", "kid-favorite"], 4, 20, 30, 0,
+      ["1/2 cup breadcrumbs", "1/3 cup milk", "1 lb ground beef", "1 egg", "1/3 cup grated parmesan", "2 cloves garlic, minced", "2 tbsp chopped parsley", "1 tsp salt", "1/4 tsp black pepper", "1 jar (24 oz) marinara sauce", "12 oz spaghetti"],
+      ["Heat the oven to 400°F. Line a baking sheet with parchment.", "Mix the breadcrumbs and milk in a big bowl and let them soak for 5 minutes.", "Add the beef, egg, parmesan, garlic, parsley, salt and pepper. Mix gently with clean hands.", "Roll into balls about the size of a ping-pong ball. You'll get about 20.", "Bake for 15 minutes.", "Warm the marinara in a big pot. Add the meatballs and simmer for 10 minutes.", "Cook the spaghetti as the package says. Serve the meatballs and sauce on top."],
+      "Kids love rolling the meatballs. Freeze extra cooked meatballs for a quick dinner."),
+
+    d("chicken-parmesan", "Baked Chicken Parmesan", "", "🍗", ["dinner"], ["meat", "kid-favorite"], 4, 15, 25, 0,
+      ["2 large chicken breasts, sliced in half into 4 thin cutlets", "1/2 tsp salt", "1/2 cup flour", "2 eggs, beaten", "1 cup panko breadcrumbs", "1/2 cup grated parmesan", "1 tsp Italian seasoning", "2 tbsp olive oil", "1 1/2 cups marinara sauce", "1 cup shredded mozzarella", "Fresh basil, for serving"],
+      ["Heat the oven to 425°F. Line a baking sheet with parchment.", "Toast the panko in the olive oil in a pan over medium heat for 3 minutes until golden. Let it cool, then mix in the parmesan and Italian seasoning.", "Sprinkle the chicken with salt. Dip each piece in flour, then egg, then press it into the crumbs.", "Bake for 15 minutes.", "Spoon marinara over each piece and top with mozzarella.", "Bake for 8 to 10 minutes more, until the cheese bubbles and the chicken is cooked through.", "Top with basil. Serve with pasta or a salad."]),
+
+    d("minestrone", "Minestrone Soup", "", "🥣", ["dinner", "lunch"], ["soup", "veggie", "healthy"], 6, 15, 35, 0,
+      ["2 tbsp olive oil", "1 onion, diced", "2 carrots, diced", "2 celery stalks, diced", "2 cloves garlic, minced", "1 zucchini, diced", "1 tsp dried Italian herbs", "1 can (14 oz) diced tomatoes", "6 cups vegetable broth", "1 tsp salt", "1 can (15 oz) cannellini beans, drained and rinsed", "1 cup small pasta (like ditalini or small shells)", "2 cups baby spinach", "Grated parmesan, for serving"],
+      ["Heat the oil in a big pot. Cook the onion, carrots and celery for 6 minutes.", "Add the garlic, zucchini and herbs. Cook for 2 minutes.", "Add the tomatoes, broth and salt. Bring to a boil, then simmer for 15 minutes.", "Add the beans and pasta. Cook for 10 minutes until the pasta is soft.", "Stir in the spinach for 1 minute. Serve with parmesan on top."],
+      "The pasta keeps soaking up the broth, so add a splash of water when you reheat it."),
+
+    d("pesto-pasta", "Pesto Pasta with Peas", "", "🍝", ["lunch", "dinner"], ["noodles", "veggie", "quick", "kid-favorite"], 4, 10, 12, 0,
+      ["12 oz short pasta (like fusilli)", "1 cup frozen peas", "For the pesto:", "2 cups fresh basil leaves", "1/3 cup grated parmesan", "1/4 cup pine nuts or walnuts", "1 clove garlic", "1/3 cup olive oil", "1 tbsp lemon juice", "1/4 tsp salt"],
+      ["Cook the pasta as the package says. Add the peas for the last 2 minutes. Save 1/2 cup of the cooking water, then drain.", "Blend the basil, parmesan, nuts, garlic, oil, lemon juice and salt until smooth.", "Toss the pasta and peas with the pesto. Add a splash of the pasta water until it's creamy."],
+      "Nut-free? Use sunflower seeds. A jar of store-bought pesto works on busy nights."),
+
+    d("lasagna", "Classic Lasagna", "", "🍝", ["dinner"], ["meat", "noodles", "kid-favorite"], 8, 30, 60, 0,
+      ["1 lb ground beef", "1 onion, diced", "2 cloves garlic, minced", "1 jar (24 oz) marinara sauce", "1 can (15 oz) tomato sauce", "1 tsp dried Italian herbs", "12 lasagna noodles (no-boil, or boiled as the package says)", "15 oz ricotta cheese", "1 egg", "1/2 cup grated parmesan", "3 cups shredded mozzarella", "1/2 tsp salt"],
+      ["Heat the oven to 375°F.", "Cook the beef and onion in a big pan for 8 minutes, breaking up the meat. Add the garlic for 1 minute.", "Stir in the marinara, tomato sauce and herbs. Simmer for 10 minutes.", "Mix the ricotta, egg, half the parmesan and the salt.", "Spread 1 cup of sauce in a 9x13 baking dish.", "Layer noodles, ricotta, mozzarella and sauce. Repeat 3 times, ending with sauce, mozzarella and the rest of the parmesan.", "Cover with foil and bake for 40 minutes. Take off the foil and bake for 15 minutes more, until bubbly.", "Let it rest for 15 minutes before cutting."],
+      "Make it the day before and bake it when you're ready. It freezes well too."),
+
+    d("chicken-broccoli-alfredo", "Chicken & Broccoli Alfredo", "", "🍝", ["dinner"], ["noodles", "meat", "kid-favorite"], 4, 10, 20, 0,
+      ["12 oz fettuccine", "3 cups broccoli florets", "1 lb chicken breast, cut into bite-size pieces", "1/2 tsp salt", "1 tbsp olive oil", "2 tbsp butter", "2 cloves garlic, minced", "2 tbsp flour", "2 cups milk", "1 cup grated parmesan", "1/4 tsp black pepper"],
+      ["Cook the fettuccine as the package says. Add the broccoli for the last 3 minutes. Drain.", "Sprinkle the chicken with salt. Cook it in the olive oil for 6 to 7 minutes until cooked through. Set aside.", "Melt the butter in the same pan. Cook the garlic for 30 seconds, then stir in the flour for 1 minute.", "Slowly whisk in the milk. Simmer for 4 minutes, stirring, until it thickens.", "Turn off the heat. Stir in the parmesan and pepper.", "Toss the pasta, broccoli and chicken in the sauce."],
+      "Lighter than restaurant Alfredo: it's made with milk instead of heavy cream."),
+  ]),
+
+  ...world("mexican", [
+    d("chicken-enchiladas", "Mild Chicken Enchiladas", "", "🌯", ["dinner"], ["meat", "kid-favorite"], 4, 20, 25, 0,
+      ["3 cups cooked shredded chicken (a rotisserie chicken works)", "1 can (15 oz) black beans, drained and rinsed", "1/2 tsp ground cumin", "2 cups shredded Mexican-blend cheese", "2 1/2 cups mild red enchilada sauce", "8 small flour tortillas", "Chopped cilantro, for serving", "Sour cream, for serving"],
+      ["Heat the oven to 375°F.", "Mix the chicken, beans, cumin, 1 cup of the cheese and 1/2 cup of the sauce.", "Spread 1/2 cup of sauce in a 9x13 baking dish.", "Fill each tortilla with about 1/2 cup of filling, roll it up and lay it seam side down in the dish.", "Pour the rest of the sauce over the top and sprinkle with the rest of the cheese.", "Cover with foil and bake for 20 minutes. Uncover and bake 5 minutes more until bubbly.", "Top with cilantro and serve with sour cream."]),
+
+    d("burrito-bowls", "Chicken Burrito Bowls", "", "🍚", ["lunch", "dinner"], ["meat", "rice", "healthy", "kid-favorite"], 4, 15, 25, 0,
+      ["1 1/2 lb boneless chicken thighs", "1 tbsp olive oil", "1 tsp mild chili powder", "1 tsp ground cumin", "1/2 tsp garlic powder", "1/2 tsp salt", "1 lime", "3 cups cooked rice", "1 can (15 oz) black beans, warmed", "1 cup corn kernels", "1 cup cherry tomatoes, halved", "1 avocado, sliced", "1/2 cup shredded cheddar", "Salsa, for serving"],
+      ["Rub the chicken with the oil, chili powder, cumin, garlic powder and salt.", "Cook it in a pan over medium-high heat for 5 to 6 minutes per side until cooked through.", "Let it rest for 5 minutes, then slice.", "Squeeze half the lime over the rice and stir.", "Build the bowls: rice, beans, corn, chicken, tomatoes, avocado and cheese.", "Squeeze the rest of the lime on top and add salsa."],
+      "A build-your-own bowl night: set everything out and let the kids choose."),
+
+    d("tortilla-soup", "Chicken Tortilla Soup", "", "🥣", ["dinner"], ["soup", "meat", "healthy"], 6, 15, 30, 0,
+      ["1 tbsp olive oil", "1 onion, diced", "1 red bell pepper, diced", "3 cloves garlic, minced", "1 tsp ground cumin", "1 tsp mild chili powder", "6 cups chicken broth", "1 can (14 oz) diced tomatoes", "1 1/2 lb chicken breasts", "1 can (15 oz) black beans, drained and rinsed", "1 cup frozen corn", "1 lime", "1 avocado, diced", "1/2 cup shredded cheddar, for topping", "Tortilla chips, for topping"],
+      ["Heat the oil in a big pot. Cook the onion and pepper for 5 minutes.", "Add the garlic, cumin and chili powder for 1 minute.", "Add the broth, tomatoes and whole chicken breasts. Bring to a boil, then simmer for 20 minutes until the chicken is cooked.", "Take out the chicken, shred it with two forks and put it back.", "Add the beans and corn. Cook for 5 minutes.", "Squeeze in the lime. Top each bowl with avocado, cheese and crushed chips."]),
+
+    d("mexican-rice", "Mexican Red Rice (Arroz Rojo)", "", "🍚", ["dinner"], ["rice", "side"], 6, 5, 25, 0,
+      ["1 1/2 cups long-grain white rice", "2 tbsp vegetable oil", "1/2 onion, finely chopped", "2 cloves garlic, minced", "1 can (8 oz) tomato sauce", "2 cups chicken broth", "1 tsp salt", "1/2 tsp ground cumin", "1/2 cup frozen peas and carrots"],
+      ["Rinse the rice and drain it well.", "Heat the oil in a pot. Toast the rice, stirring, for 5 minutes until golden.", "Add the onion and garlic. Cook for 2 minutes.", "Stir in the tomato sauce, broth, salt and cumin. Bring to a boil.", "Add the peas and carrots. Cover and cook on low for 18 to 20 minutes.", "Let it sit, covered, for 5 minutes. Fluff with a fork."],
+      "Don't lift the lid while it cooks; the steam does the work."),
+
+    d("guacamole", "Kid-Friendly Guacamole", "", "🥑", ["snack"], ["veggie", "healthy", "quick", "kid-favorite"], 4, 10, 0, 0,
+      ["3 ripe avocados", "1 lime", "1/2 tsp salt", "1 small tomato, diced", "2 tbsp chopped cilantro", "1/4 cup finely chopped red onion (optional)", "Tortilla chips, for dipping"],
+      ["A grown-up cuts the avocados in half and takes out the pits. Scoop them into a bowl.", "Mash with a fork. Kids can do this part!", "Squeeze in the lime juice, add the salt and mix.", "Stir in the tomato, cilantro and onion.", "Taste and add more salt or lime if you like."],
+      "Press plastic wrap right on top of leftovers so they stay green."),
+
+    d("esquites", "Street Corn Cups (Esquites)", "", "🌽", ["snack", "dinner"], ["side", "veggie", "quick", "kid-favorite"], 4, 5, 10, 0,
+      ["4 cups corn kernels (frozen and thawed, or from 5 cobs)", "1 tbsp butter", "2 tbsp mayonnaise", "2 tbsp sour cream", "1/2 cup crumbled cotija cheese (or feta)", "1 lime", "2 tbsp chopped cilantro", "1/4 tsp chili powder (optional, for grown-ups)"],
+      ["Melt the butter in a big pan over medium-high heat.", "Add the corn and cook without stirring for 3 minutes so it browns a little. Then stir and cook 5 minutes more.", "Turn off the heat. Stir in the mayonnaise, sour cream, half the cheese and the lime juice.", "Spoon into cups. Top with the rest of the cheese and the cilantro. Grown-ups can add chili powder."]),
+  ]),
+
+  ...world("chinese", [
+    d("egg-fried-rice", "Egg Fried Rice", "", "🍳", ["lunch", "dinner"], ["rice", "quick", "kid-favorite"], 4, 10, 10, 0,
+      ["4 cups cooked rice, cold (day-old is best)", "3 eggs, beaten", "2 tbsp vegetable oil", "1 cup frozen peas and carrots", "3 green onions, sliced", "2 tbsp soy sauce", "1 tsp sesame oil"],
+      ["Break up any clumps of cold rice with your hands.", "Heat 1 tbsp of the oil in a wok or big pan over high heat. Scramble the eggs until just set, then take them out.", "Add the rest of the oil and the peas and carrots. Cook for 2 minutes.", "Add the rice and stir-fry for 4 minutes until hot and a little crispy.", "Add the soy sauce, eggs and green onions. Toss for 1 minute.", "Drizzle with sesame oil."],
+      "Fresh rice gets mushy. Cook it the day before, or spread it on a tray to cool and dry first."),
+
+    d("beef-broccoli", "Beef & Broccoli", "", "🥦", ["dinner"], ["meat", "healthy", "quick"], 4, 15, 10, 0,
+      ["1 lb flank steak, thinly sliced against the grain", "1 tbsp cornstarch", "1 tbsp soy sauce", "4 cups broccoli florets", "2 tbsp vegetable oil", "2 cloves garlic, minced", "1 tsp grated ginger", "For the sauce:", "3 tbsp soy sauce", "2 tbsp oyster sauce", "1 tbsp brown sugar", "2 tsp cornstarch", "1/2 cup water", "1 tsp sesame oil"],
+      ["Toss the beef with the cornstarch and soy sauce. Let it sit for 10 minutes.", "Stir the sauce ingredients together.", "Steam or microwave the broccoli for 2 to 3 minutes until bright green.", "Heat 1 tbsp of the oil in a big pan over high heat. Sear the beef in one layer, 1 to 2 minutes per side. Take it out.", "Add the rest of the oil, the garlic and the ginger. Cook for 30 seconds.", "Stir the sauce and pour it in. Simmer for 1 minute until glossy.", "Add the beef and broccoli and toss. Serve with rice."]),
+
+    d("sweet-sour-chicken", "Baked Sweet & Sour Chicken", "", "🍍", ["dinner"], ["meat", "kid-favorite"], 4, 15, 30, 0,
+      ["1 1/2 lb chicken breast, cut into 1-inch pieces", "1/2 tsp salt", "1/2 cup cornstarch", "2 eggs, beaten", "3 tbsp vegetable oil", "1 red bell pepper, chopped", "1 green bell pepper, chopped", "1 cup pineapple chunks", "For the sauce:", "1/2 cup sugar", "1/3 cup ketchup", "1/3 cup rice vinegar", "2 tbsp soy sauce", "1 tsp garlic powder"],
+      ["Heat the oven to 325°F.", "Sprinkle the chicken with salt. Toss it in the cornstarch, then in the egg.", "Brown the chicken in the oil in a big pan, 2 minutes per side. It doesn't need to cook through. Put it in a 9x13 baking dish.", "Whisk the sauce ingredients and pour over the chicken. Add the peppers and pineapple.", "Bake for 25 to 30 minutes, stirring halfway, until the chicken is cooked and the sauce is thick.", "Serve with rice."]),
+
+    d("potstickers", "Pork & Cabbage Potstickers", "", "🥟", ["dinner", "lunch"], ["meat", "kid-favorite"], 4, 40, 15, 0,
+      ["2 cups napa cabbage, finely chopped", "1/2 tsp salt", "1/2 lb ground pork", "2 green onions, finely chopped", "1 tsp grated ginger", "1 tbsp soy sauce", "1 tsp sesame oil", "30 round dumpling wrappers", "2 tbsp vegetable oil", "1/2 cup water", "For dipping:", "2 tbsp soy sauce", "1 tbsp rice vinegar"],
+      ["Toss the cabbage with the salt and let it sit for 10 minutes. Squeeze out the water.", "Mix the pork, cabbage, green onions, ginger, soy sauce and sesame oil.", "Put 1 tsp of filling in the middle of a wrapper. Wet the edge, fold it in half and pinch it closed. Pleats are optional!", "Heat 1 tbsp of oil in a nonstick pan over medium heat. Set the dumplings in flat side down and cook for 2 minutes until the bottoms are golden.", "Add 1/4 cup of water, cover and steam for 6 minutes, until the water is gone and the filling is cooked.", "Cook the rest the same way. Mix the soy sauce and vinegar for dipping."],
+      "Freeze uncooked dumplings on a tray, then bag them. Cook from frozen and steam 2 minutes longer."),
+
+    d("tomato-egg", "Tomato & Egg Stir-Fry", "", "🍅", ["dinner", "lunch"], ["veggie", "healthy", "quick", "kid-favorite"], 4, 10, 8, 0,
+      ["5 eggs", "1/2 tsp salt", "3 ripe tomatoes, cut into wedges", "2 tbsp vegetable oil", "1 tbsp ketchup", "1 tsp sugar", "2 tbsp water", "1 green onion, sliced"],
+      ["Beat the eggs with half the salt.", "Heat 1 tbsp of the oil over medium-high heat. Pour in the eggs and stir gently until just set but still soft. Take them out.", "Add the rest of the oil and the tomatoes. Cook for 3 minutes until soft and juicy.", "Stir in the ketchup, sugar, the rest of the salt and the water. Cook for 1 minute.", "Put the eggs back and fold everything together for 30 seconds.", "Top with green onion and serve over rice."],
+      "One of China's best-loved home dishes, and a great first dish for kids to help cook."),
+
+    d("lo-mein", "Vegetable Lo Mein", "", "🍜", ["dinner", "lunch"], ["noodles", "veggie", "quick"], 4, 15, 10, 0,
+      ["8 oz lo mein noodles or spaghetti", "2 tbsp vegetable oil", "2 cloves garlic, minced", "1 carrot, cut into thin strips", "1 red bell pepper, sliced", "2 cups shredded cabbage", "1 cup snow peas", "3 green onions, cut into 2-inch pieces", "For the sauce:", "3 tbsp soy sauce", "1 tbsp oyster sauce", "1 tsp sugar", "1 tsp sesame oil"],
+      ["Cook the noodles as the package says. Drain and rinse with warm water.", "Stir the sauce ingredients together.", "Heat the oil in a wok or big pan over high heat. Cook the garlic for 30 seconds.", "Add the carrot and pepper for 2 minutes, then the cabbage and snow peas for 2 minutes.", "Add the noodles and sauce. Toss for 2 minutes.", "Add the green onions and toss for 30 seconds."],
+      "Add leftover chicken or shrimp to make it a full meal."),
+  ]),
+
+  ...world("japanese", [
+    d("chicken-katsu", "Chicken Katsu", "", "🍱", ["dinner"], ["meat", "kid-favorite"], 4, 15, 20, 0,
+      ["2 large chicken breasts, sliced in half into 4 thin cutlets", "1/2 tsp salt", "1/2 cup flour", "2 eggs, beaten", "1 1/2 cups panko breadcrumbs", "3 tbsp vegetable oil", "2 cups finely shredded cabbage", "For the katsu sauce:", "3 tbsp ketchup", "2 tbsp Worcestershire sauce", "1 tbsp oyster sauce", "1 tsp sugar"],
+      ["Pound the cutlets to an even 1/2 inch thick. Sprinkle with salt.", "Dip each one in flour, then egg, then press it into the panko.", "Heat the oil in a big pan over medium heat.", "Cook for 4 to 5 minutes per side until golden and cooked through.", "Let them rest for 2 minutes, then slice into strips.", "Stir the sauce together. Serve with the cabbage and rice."]),
+
+    d("oyakodon", "Chicken & Egg Rice Bowl (Oyakodon)", "", "🍚", ["dinner", "lunch"], ["rice", "meat", "quick", "kid-favorite"], 2, 10, 12, 0,
+      ["3/4 cup dashi or chicken broth", "2 tbsp soy sauce", "2 tbsp mirin", "1 tbsp sugar", "1/2 onion, thinly sliced", "2 boneless chicken thighs, cut into bite-size pieces", "3 eggs", "2 cups cooked short-grain rice", "1 green onion, sliced"],
+      ["Bring the dashi, soy sauce, mirin and sugar to a simmer in a small pan.", "Add the onion and cook for 3 minutes.", "Add the chicken. Cover and simmer for 5 to 6 minutes until cooked.", "Beat the eggs lightly and pour them over the chicken in a circle.", "Cover and cook for 1 to 2 minutes until the eggs are set.", "Slide it over bowls of rice and top with green onion."],
+      "Oyako means \"parent and child\": the chicken and the egg! For little kids, cook until the egg is fully set."),
+
+    d("miso-soup", "Miso Soup", "", "🥣", ["breakfast", "dinner"], ["soup", "healthy", "quick"], 4, 5, 10, 0,
+      ["1 tbsp dried wakame seaweed", "4 cups dashi", "3 tbsp white miso paste", "7 oz silken or soft tofu, cubed", "2 green onions, sliced"],
+      ["Soak the wakame in water for 5 minutes, then drain.", "Heat the dashi until it's steaming. Don't let it boil.", "Put the miso in a ladle, dip it into the dashi and stir until it melts in.", "Add the tofu and wakame. Warm for 2 minutes.", "Top with green onions."],
+      "Boiling miso dulls its flavor, so keep it just below a boil."),
+
+    d("japanese-curry", "Japanese Curry Rice", "", "🍛", ["dinner"], ["meat", "kid-favorite"], 6, 15, 35, 0,
+      ["1 tbsp vegetable oil", "1 onion, cut into wedges", "1 lb boneless chicken thighs, cut into bite-size pieces", "2 carrots, cut into chunks", "2 potatoes, cut into chunks", "3 cups water", "1 box (3.5 oz) mild Japanese curry roux", "1 small apple, grated (optional)", "6 cups cooked short-grain rice"],
+      ["Heat the oil in a big pot. Cook the onion for 5 minutes until soft.", "Add the chicken and cook for 3 minutes.", "Add the carrots, potatoes and water. Bring to a boil, skim off the foam, then simmer for 15 minutes until the vegetables are soft.", "Turn off the heat. Break in the curry roux and stir until it melts.", "Add the apple and simmer for 5 minutes, stirring, until thick.", "Serve over rice."],
+      "A favorite of Japanese kids. The boxed roux comes mild, medium or hot."),
+
+    d("yaki-udon", "Stir-Fried Udon (Yaki Udon)", "", "🍜", ["lunch", "dinner"], ["noodles", "quick"], 4, 10, 10, 0,
+      ["4 packages (7 oz each) frozen udon noodles", "8 oz thinly sliced pork or chicken", "2 tbsp vegetable oil", "2 cups shredded cabbage", "1 carrot, cut into thin strips", "4 shiitake mushrooms, sliced", "2 green onions, cut into 2-inch pieces", "For the sauce:", "3 tbsp soy sauce", "1 tbsp oyster sauce", "1 tbsp mirin", "1 tsp sugar"],
+      ["Boil the udon for 1 minute to loosen it, then drain.", "Stir the sauce ingredients together.", "Heat the oil in a big pan over high heat. Cook the pork for 3 minutes.", "Add the cabbage, carrot and mushrooms. Cook for 3 minutes.", "Add the udon and sauce. Toss for 2 to 3 minutes.", "Add the green onions and toss."]),
+
+    d("gyudon", "Beef Rice Bowl (Gyudon)", "", "🍚", ["dinner"], ["meat", "rice", "quick"], 4, 10, 12, 0,
+      ["1 cup dashi or water", "3 tbsp soy sauce", "2 tbsp mirin", "1 tbsp sugar", "1 tsp grated ginger", "1 onion, thinly sliced", "1 lb beef, sliced paper-thin (shabu-shabu beef or ribeye)", "4 cups cooked short-grain rice", "2 green onions, sliced"],
+      ["Bring the dashi, soy sauce, mirin, sugar and ginger to a simmer.", "Add the onion and cook for 5 minutes until soft.", "Add the beef, pulling the slices apart. Cook for 2 to 3 minutes until no longer pink. Skim off any foam.", "Spoon the beef, onion and some sauce over bowls of rice.", "Top with green onions."],
+      "Asian markets sell beef sliced paper-thin for this."),
+  ]),
+
+  ...world("indian", [
+    d("butter-chicken", "Mild Butter Chicken", "", "🍛", ["dinner"], ["meat", "kid-favorite"], 4, 15, 30, 0,
+      ["1 1/2 lb boneless chicken thighs, cut into bite-size pieces", "1/2 cup plain yogurt", "1 tsp salt", "2 tsp garam masala", "2 tbsp butter", "1 onion, finely chopped", "3 cloves garlic, minced", "1 tbsp grated ginger", "1 tsp ground cumin", "1/2 tsp ground turmeric", "1 can (15 oz) tomato sauce", "3/4 cup heavy cream or half-and-half", "1 tbsp honey", "Chopped cilantro, for serving"],
+      ["Mix the chicken with the yogurt, half the salt and 1 tsp of the garam masala. Let it sit for 30 minutes, or overnight in the fridge.", "Melt the butter in a big pan over medium heat. Cook the onion for 6 minutes until soft.", "Add the garlic, ginger, cumin, turmeric and the rest of the garam masala. Cook for 1 minute.", "Add the tomato sauce and simmer for 10 minutes.", "Add the chicken and its marinade. Cover and simmer for 12 to 15 minutes until cooked through.", "Stir in the cream, honey and the rest of the salt. Simmer for 3 minutes.", "Top with cilantro. Serve with rice or naan."],
+      "Garam masala is warm, not hot. Grown-ups can add chili flakes to their own plate."),
+
+    d("chana-masala", "Mild Chickpea Curry (Chana Masala)", "", "🫘", ["dinner", "lunch"], ["veggie", "healthy", "quick"], 4, 10, 25, 0,
+      ["2 tbsp vegetable oil", "1 onion, finely chopped", "3 cloves garlic, minced", "1 tbsp grated ginger", "1 tsp ground cumin", "1 tsp ground coriander", "1 tsp garam masala", "1/2 tsp ground turmeric", "1 can (14 oz) crushed tomatoes", "2 cans (15 oz each) chickpeas, drained and rinsed", "1/2 cup water", "1 tsp salt", "1 lemon", "Chopped cilantro, for serving"],
+      ["Heat the oil and cook the onion for 8 minutes until golden.", "Add the garlic, ginger and spices. Cook for 1 minute.", "Add the tomatoes and cook for 5 minutes.", "Add the chickpeas, water and salt. Simmer for 15 minutes, mashing a few chickpeas to thicken it.", "Squeeze in the lemon, top with cilantro, and serve with rice or flatbread."]),
+
+    d("dal", "Yellow Lentil Dal", "", "🥣", ["dinner", "lunch"], ["soup", "veggie", "healthy"], 4, 5, 30, 0,
+      ["1 cup yellow split lentils (moong dal or toor dal), rinsed", "4 cups water", "1/2 tsp ground turmeric", "1 tsp salt", "2 tbsp ghee or butter", "1 tsp cumin seeds", "1/2 onion, finely chopped", "2 cloves garlic, minced", "1 tomato, chopped", "Chopped cilantro, for serving"],
+      ["Simmer the lentils, water and turmeric for 25 minutes, stirring now and then, until very soft. Whisk them smooth and add the salt.", "Melt the ghee in a small pan. Add the cumin seeds and cook for 30 seconds until they sizzle.", "Add the onion and cook for 5 minutes, then the garlic and tomato for 3 minutes.", "Pour it over the dal (it will sizzle!) and stir.", "Top with cilantro and serve with rice."],
+      "The sizzling butter and spices on top is called a tadka."),
+
+    d("veg-pulao", "Vegetable Pulao", "", "🍚", ["dinner"], ["rice", "veggie", "side"], 4, 10, 25, 0,
+      ["1 1/2 cups basmati rice", "2 tbsp ghee or butter", "1 tsp cumin seeds", "1 bay leaf", "4 green cardamom pods (optional)", "1 cinnamon stick", "1 onion, thinly sliced", "1 1/2 cups frozen mixed vegetables", "1 tsp salt", "2 1/2 cups water"],
+      ["Rinse the rice until the water runs clear. Soak it for 20 minutes, then drain.", "Melt the ghee in a pot. Add the cumin seeds, bay leaf, cardamom and cinnamon for 30 seconds.", "Add the onion and cook for 6 minutes until golden.", "Add the vegetables for 2 minutes, then the rice. Stir gently for 1 minute.", "Add the water and salt. Bring to a boil, then cover and cook on low for 15 minutes.", "Let it sit, covered, for 5 minutes. Fluff it and take out the whole spices."],
+      "Take out the whole spices before serving to little ones."),
+
+    d("mango-lassi", "Mango Lassi", "", "🥭", ["snack", "breakfast"], ["healthy", "quick", "kid-favorite"], 2, 5, 0, 0,
+      ["1 cup chopped ripe mango (or canned mango pulp)", "1 cup plain yogurt", "1/2 cup milk", "1 tbsp honey", "1 pinch ground cardamom (optional)", "4 ice cubes"],
+      ["Put everything in a blender.", "Blend until smooth and frothy.", "Pour into glasses and drink!"]),
+  ]),
+
+  ...world("thai", [
+    d("pad-thai", "Chicken Pad Thai", "", "🍜", ["dinner"], ["noodles", "meat", "kid-favorite"], 4, 20, 15, 0,
+      ["8 oz flat rice noodles (pad thai noodles)", "2 tbsp vegetable oil", "1 lb chicken breast, thinly sliced", "2 cloves garlic, minced", "2 eggs", "2 cups bean sprouts", "3 green onions, cut into 2-inch pieces", "1/3 cup roasted peanuts, chopped", "1 lime, cut into wedges", "For the sauce:", "3 tbsp tamarind paste (or 2 tbsp lime juice)", "3 tbsp fish sauce", "3 tbsp brown sugar", "1 tbsp soy sauce"],
+      ["Soak the noodles in warm water for 30 minutes until bendy, then drain.", "Stir the sauce ingredients until the sugar dissolves.", "Heat the oil in a wok or big pan over high heat. Cook the chicken for 4 to 5 minutes until cooked, then push it to the side.", "Add the garlic and eggs and scramble until set.", "Add the noodles and sauce. Toss for 2 to 3 minutes until the noodles are soft. Add a splash of water if they stick.", "Add the bean sprouts and green onions and toss for 1 minute.", "Top with peanuts and serve with lime wedges."],
+      "Not spicy as written. Grown-ups can add chili flakes at the table, the Thai way."),
+
+    d("chicken-satay", "Chicken Satay with Peanut Sauce", "", "🍢", ["dinner", "snack"], ["meat", "kid-favorite"], 4, 20, 10, 0,
+      ["1 1/2 lb boneless chicken thighs, cut into strips", "1 cup coconut milk", "2 tbsp soy sauce", "1 tsp mild curry powder", "1/2 tsp ground turmeric", "1 tbsp brown sugar", "12 wooden skewers, soaked in water", "For the peanut sauce:", "1/2 cup creamy peanut butter", "1 tbsp lime juice", "1 tbsp honey", "2 tbsp warm water"],
+      ["Mix half the coconut milk with 1 tbsp of the soy sauce, the curry powder, turmeric and brown sugar. Toss the chicken in it and let it sit for 30 minutes, or overnight in the fridge.", "Thread the chicken onto the skewers.", "Cook on a hot grill pan or under the broiler for 4 to 5 minutes per side until cooked and a little charred.", "Whisk the peanut butter, the rest of the coconut milk and soy sauce, the lime juice, honey and water until smooth.", "Serve the skewers with the peanut sauce, rice and cucumber slices."],
+      "Kids love dipping. Grown-ups can stir chili sauce into their own peanut sauce."),
+
+    d("yellow-curry", "Thai Yellow Curry with Chicken", "", "🍛", ["dinner"], ["meat", "kid-favorite"], 4, 15, 25, 1,
+      ["1 tbsp vegetable oil", "2 tbsp Thai yellow curry paste (1 tbsp for little kids)", "1 can (13.5 oz) coconut milk", "1 lb boneless chicken thighs, cut into bite-size pieces", "2 potatoes, cut into 1-inch chunks", "1 onion, cut into wedges", "1 cup chicken broth", "1 cup green beans, cut in half", "1 tbsp fish sauce", "1 tbsp brown sugar", "Cooked jasmine rice, for serving"],
+      ["Heat the oil over medium heat. Cook the curry paste for 1 minute until it smells good.", "Stir in half the coconut milk and simmer for 2 minutes.", "Add the chicken and stir for 3 minutes.", "Add the potatoes, onion, the rest of the coconut milk and the broth. Simmer for 15 minutes until the potatoes are soft.", "Add the green beans, fish sauce and sugar. Cook for 4 minutes.", "Serve over jasmine rice."],
+      "Yellow curry is the mildest Thai curry. Use less paste for kids, or more for grown-ups."),
+
+    d("pad-kra-pao", "Thai Basil Chicken (Pad Kra Pao)", "", "🍗", ["dinner"], ["meat", "quick"], 4, 10, 10, 0,
+      ["1 lb ground chicken", "2 tbsp vegetable oil", "4 cloves garlic, minced", "1 small onion, sliced", "1 red bell pepper, sliced", "1 Thai chili, sliced (optional, for grown-ups)", "1 cup Thai basil leaves (or regular basil)", "4 eggs (optional, fried, for the top)", "For the sauce:", "1 tbsp oyster sauce", "1 tbsp soy sauce", "1 tsp fish sauce", "1 tsp sugar", "2 tbsp water"],
+      ["Stir the sauce ingredients together.", "Heat the oil in a big pan over high heat. Cook the garlic (and chili, if using) for 30 seconds.", "Add the chicken and cook for 4 minutes, breaking it up, until cooked through.", "Add the onion and pepper for 2 minutes.", "Pour in the sauce and cook for 1 minute.", "Turn off the heat and stir in the basil until it wilts.", "Serve over rice, with a fried egg on top if you like."],
+      "In Thailand it's very spicy. This version is mild, with the chili just for grown-ups."),
+
+    d("mango-sticky-rice", "Mango Sticky Rice", "", "🥭", ["snack"], ["treat", "kid-favorite"], 4, 10, 25, 0,
+      ["1 cup Thai sweet rice (glutinous rice)", "1 can (13.5 oz) coconut milk", "1/3 cup sugar", "1/2 tsp salt", "2 ripe mangoes, sliced", "1 tbsp toasted sesame seeds (optional)"],
+      ["Soak the rice in water for 4 hours, or overnight. Drain.", "Steam the rice in a steamer basket lined with a damp cloth for 20 to 25 minutes until shiny and chewy.", "Warm the coconut milk with the sugar and salt until dissolved. Don't let it boil.", "Stir 3/4 of the warm coconut milk into the hot rice. Cover and let it sit for 15 minutes.", "Serve the rice with mango slices, drizzle with the rest of the coconut milk, and sprinkle with sesame seeds."],
+      "Plain sushi rice won't work here: look for \"sweet\" or \"glutinous\" rice at an Asian market."),
+  ]),
+
+  ...world("mediterranean", [
+    d("chicken-souvlaki", "Chicken Souvlaki with Tzatziki", "", "🍢", ["dinner"], ["meat", "healthy", "kid-favorite"], 4, 20, 12, 0,
+      ["1 1/2 lb boneless chicken breast, cut into 1-inch cubes", "3 tbsp olive oil", "1 lemon, juiced", "3 cloves garlic, minced", "1 tsp dried oregano", "1/2 tsp salt", "8 wooden skewers, soaked in water", "4 pita breads", "For the tzatziki:", "1 cup plain Greek yogurt", "1/2 cucumber, grated and squeezed dry", "1 clove garlic, grated", "1 tbsp lemon juice", "1 tbsp chopped dill", "1/4 tsp salt"],
+      ["Mix the oil, lemon juice, garlic, oregano and salt. Toss the chicken in it and let it sit for 30 minutes, or up to overnight in the fridge.", "Thread the chicken onto the skewers.", "Grill or broil for 10 to 12 minutes, turning a few times, until cooked through.", "Stir the tzatziki ingredients together.", "Warm the pitas. Serve the chicken with tzatziki, tomatoes and cucumber."]),
+
+    d("greek-salad", "Greek Salad", "", "🥗", ["lunch", "dinner"], ["veggie", "side", "healthy", "quick"], 4, 15, 0, 0,
+      ["3 tomatoes, cut into chunks", "1 cucumber, sliced", "1/2 red onion, thinly sliced", "1 green bell pepper, sliced", "1/2 cup Kalamata olives", "4 oz feta cheese", "3 tbsp olive oil", "1 tbsp red wine vinegar", "1 tsp dried oregano", "Salt to taste"],
+      ["Put the tomatoes, cucumber, onion, pepper and olives in a big bowl.", "Drizzle with the oil and vinegar. Sprinkle with oregano and salt, and toss gently.", "Top with the feta, in one big piece like in Greece, or crumbled."],
+      "Soak the sliced onion in cold water for 10 minutes to make it milder for kids."),
+
+    d("baked-falafel", "Baked Falafel", "", "🧆", ["dinner", "lunch"], ["veggie", "healthy"], 4, 20, 25, 0,
+      ["1/2 onion, roughly chopped", "3 cloves garlic", "1 cup fresh parsley", "1/2 cup fresh cilantro", "2 cans (15 oz each) chickpeas, drained, rinsed and patted dry", "1 tsp ground cumin", "1 tsp ground coriander", "1 tsp salt", "1 tsp baking powder", "3 tbsp flour", "3 tbsp olive oil", "Pita bread, for serving", "Hummus, for serving"],
+      ["Heat the oven to 400°F. Brush a baking sheet with 1 tbsp of the oil.", "Pulse the onion, garlic, parsley and cilantro in a food processor until finely chopped.", "Add the chickpeas, spices, salt and baking powder. Pulse until it looks like coarse sand, not a paste.", "Stir in the flour. Roll into 16 balls and flatten them a little.", "Put them on the baking sheet and brush with the rest of the oil.", "Bake for 12 minutes, flip, and bake 10 to 12 minutes more until golden.", "Serve in pita with hummus, cucumber and tomato."]),
+
+    d("shakshuka", "Shakshuka (Eggs in Tomato Sauce)", "", "🍳", ["breakfast", "dinner"], ["veggie", "healthy"], 4, 10, 25, 0,
+      ["2 tbsp olive oil", "1 onion, diced", "1 red bell pepper, diced", "3 cloves garlic, minced", "1 tsp ground cumin", "1 tsp sweet paprika", "1 can (28 oz) crushed tomatoes", "1/2 tsp salt", "1 tsp sugar", "6 eggs", "1/4 cup crumbled feta (optional)", "2 tbsp chopped parsley", "Crusty bread, for serving"],
+      ["Heat the oil in a big skillet. Cook the onion and pepper for 6 minutes.", "Add the garlic, cumin and paprika for 1 minute.", "Add the tomatoes, salt and sugar. Simmer for 10 minutes until thick.", "Make 6 little wells in the sauce and crack an egg into each.", "Cover and cook on low for 6 to 8 minutes until the whites are set.", "Top with feta and parsley. Serve with bread for dipping."],
+      "For kids, cook a few minutes longer so the yolks are firm."),
+
+    d("lentil-soup", "Red Lentil Soup", "", "🥣", ["lunch", "dinner"], ["soup", "veggie", "healthy"], 6, 10, 30, 0,
+      ["2 tbsp olive oil", "1 onion, diced", "1 carrot, diced", "2 cloves garlic, minced", "1 tsp ground cumin", "1 tsp paprika", "1 tbsp tomato paste", "1 1/2 cups red lentils, rinsed", "6 cups vegetable broth", "1 tsp salt", "1 lemon", "Pita bread, for serving"],
+      ["Heat the oil in a big pot. Cook the onion and carrot for 6 minutes.", "Add the garlic, cumin, paprika and tomato paste for 1 minute.", "Add the lentils, broth and salt. Bring to a boil, then simmer for 20 minutes until the lentils fall apart.", "Blend until smooth, or leave it chunky.", "Squeeze in the lemon and serve with warm pita."],
+      "In Turkey, families often eat this for breakfast on cold mornings."),
+  ]),
+];
+
+// A video for each starter: the creator's own TikTok for the trending dishes, and a
+// YouTube video from a well-known cook for the rest (their version of the dish).
 const STARTER_VIDEOS = {
+  "sheet-pan-salmon": "https://www.youtube.com/watch?v=pHzsIOmO2GA",
+  "chicken-noodle-soup": "https://www.youtube.com/watch?v=06Vrqqo1SaU",
+  "grilled-cheese-soup": "https://www.youtube.com/watch?v=3bs-fFz5wQo",
+  "pinwheels": "https://www.youtube.com/watch?v=RQa7VtxNf2A",
+  "pancakes": "https://www.youtube.com/watch?v=7ys0sQ7CkD0",
+  "oatmeal": "https://www.youtube.com/watch?v=TbpsFaTSQOU",
+  "scrambled-eggs": "https://www.youtube.com/watch?v=ZgpqLEZKVGw",
+  "smoothie": "https://www.youtube.com/watch?v=ZWnVS7JI_pE",
+  "parfait": "https://www.youtube.com/watch?v=o827swrnk44",
+  "turkey-chili": "https://www.youtube.com/watch?v=SRV89xGUmaA",
+  "chicken-tenders": "https://www.youtube.com/watch?v=ldD8Pu-MySY",
+  "mac-and-cheese": "https://www.youtube.com/watch?v=LEcflVF2Qr8",
+  "sloppy-joes": "https://www.youtube.com/watch?v=t2RRV6IFPDw",
+  "mini-meatloaves": "https://www.youtube.com/watch?v=0NmHtvXMpWM",
+  "beef-stew": "https://www.youtube.com/watch?v=S1B5nr5r3tk",
+  "fish-sticks": "https://www.youtube.com/watch?v=dbHNwYXmRBU",
+  "cheeseburgers": "https://www.youtube.com/watch?v=TNI0TZ7sLYQ",
+  "baked-potato-bar": "https://www.youtube.com/watch?v=BFX9QJzd2ms",
+  "french-toast": "https://www.youtube.com/watch?v=Km7KRbKVu88",
+  "banana-oat-muffins": "https://www.youtube.com/watch?v=uPY2xF47uSg",
+  "veggie-egg-muffins": "https://www.youtube.com/watch?v=J26ixgWpTEg",
+  "tteokguk": "https://www.youtube.com/watch?v=P_PI1p3bnQU",
+  "manduguk": "https://www.youtube.com/watch?v=a4nrLCNlsy8",
+  "janchi-guksu": "https://www.youtube.com/watch?v=aH5RumwqYCg",
+  "jjajangmyeon": "https://www.youtube.com/watch?v=F4Cm75Qvk4A",
+  "gungjung-tteokbokki": "https://www.youtube.com/watch?v=w_GBd5YJtFU",
+  "la-galbi": "https://www.youtube.com/watch?v=JAF3Bpy-AsY",
+  "ganjang-jeyuk": "https://www.youtube.com/watch?v=SYNqIOHjiJE",
+  "samgyetang": "https://www.youtube.com/watch?v=JUmFtHqwrnk",
+  "gyeran-guk": "https://www.youtube.com/watch?v=4q6Ob5vpH68",
+  "sigeumchi-doenjang-guk": "https://www.youtube.com/watch?v=5u8PA08c-_k",
+  "eomuk-bokkeum": "https://www.youtube.com/watch?v=DT3eOimZzz4",
+  "myeolchi-bokkeum": "https://www.youtube.com/watch?v=_bu2n6D0yiM",
+  "oi-muchim": "https://www.youtube.com/watch?v=zau-F0L_hrY",
+  "yubu-chobap": "https://www.youtube.com/watch?v=PVOUSVuOO8A",
+  "bulgogi": "https://www.youtube.com/watch?v=3qBjL_HGvco",
+  "japchae": "https://www.youtube.com/watch?v=i1djfV9uigc",
+  "kimchi-fried-rice": "https://www.youtube.com/watch?v=Lf44Fk7H24s",
+  "bibimbap": "https://www.youtube.com/watch?v=6KCWzRfFyr4",
+  "doenjang-jjigae": "https://www.youtube.com/watch?v=WO6NEeCj660",
+  "kimchi-jjigae": "https://www.youtube.com/watch?v=rJgb92JWMCE",
+  "miyeok-guk": "https://www.youtube.com/watch?v=PmVvZeA4myo",
+  "ganjang-chicken": "https://www.youtube.com/watch?v=BjBRtGUDfzY",
+  "galbi-jjim": "https://www.youtube.com/watch?v=vtGzj6cUn7Q",
+  "mackerel": "https://www.youtube.com/watch?v=ZMYtYwjLQCE",
+  "dubu-jorim": "https://www.youtube.com/watch?v=ob2CYmTx9PM",
+  "kongnamul-guk": "https://www.youtube.com/watch?v=iXCHOEPKqOs",
+  "dakjuk": "https://www.youtube.com/watch?v=tUtlhEz4Was",
+  "gyeran-jjim": "https://www.youtube.com/watch?v=WuNrLgh2Vw0",
+  "sigeumchi-namul": "https://www.youtube.com/watch?v=P4JgJec4QQI",
+  "kongnamul-muchim": "https://www.youtube.com/watch?v=NWfhIq_MiiU",
+  "kimbap": "https://www.youtube.com/watch?v=syXr9kVTwO8",
+  "spaghetti": "https://www.youtube.com/watch?v=GBEk8OCjQZA",
+  "flatbread-pizza": "https://www.youtube.com/watch?v=WVLLvwcUqRY",
+  "meatballs-marinara": "https://www.youtube.com/watch?v=Suu0jZtr_jM",
+  "chicken-parmesan": "https://www.youtube.com/watch?v=Ml6GGWqRlSA",
+  "minestrone": "https://www.youtube.com/watch?v=2bQdqBq8Ac8",
+  "pesto-pasta": "https://www.youtube.com/watch?v=c2BkrkYx3_4",
+  "lasagna": "https://www.youtube.com/watch?v=fVDsTP-pTXs",
+  "chicken-broccoli-alfredo": "https://www.youtube.com/watch?v=CV7RZkUDHFE",
+  "chicken-tacos": "https://www.youtube.com/watch?v=2641uVz9E6w",
+  "chicken-fajitas": "https://www.youtube.com/watch?v=JeL5HwTChQE",
+  "quesadillas": "https://www.youtube.com/watch?v=1dAACUeacZU",
+  "breakfast-burritos": "https://www.youtube.com/watch?v=f0AQD5fBXOU",
+  "chicken-enchiladas": "https://www.youtube.com/watch?v=76bJglYQhqw",
+  "burrito-bowls": "https://www.youtube.com/watch?v=RMBti8WALKQ",
+  "tortilla-soup": "https://www.youtube.com/watch?v=QBVuoaRUEko",
+  "mexican-rice": "https://www.youtube.com/watch?v=Dce8LipEL30",
+  "guacamole": "https://www.youtube.com/watch?v=VUz3wG0Wzws",
+  "esquites": "https://www.youtube.com/watch?v=yqrz77u_F9Y",
+  "teriyaki-chicken": "https://www.youtube.com/watch?v=LZ6rXyFRJjk",
+  "egg-fried-rice": "https://www.youtube.com/watch?v=tn0YTv4S9vI",
+  "beef-broccoli": "https://www.youtube.com/watch?v=n_0JYAQzYAg",
+  "sweet-sour-chicken": "https://www.youtube.com/watch?v=UT3qngmEpU4",
+  "potstickers": "https://www.youtube.com/watch?v=tFhdiIWyxZI",
+  "tomato-egg": "https://www.youtube.com/watch?v=Wn8ox93Qhus",
+  "lo-mein": "https://www.youtube.com/watch?v=LrjNFtgSXks",
+  "chicken-katsu": "https://www.youtube.com/watch?v=0g9hC2xyY50",
+  "oyakodon": "https://www.youtube.com/watch?v=Vlp6ufKYDzk",
+  "miso-soup": "https://www.youtube.com/watch?v=m4zWYvSWyR8",
+  "japanese-curry": "https://www.youtube.com/watch?v=s57Yi10AB08",
+  "yaki-udon": "https://www.youtube.com/watch?v=QogTbx3loow",
+  "gyudon": "https://www.youtube.com/watch?v=gCQGDWlVN50",
+  "butter-chicken": "https://www.youtube.com/watch?v=aKV1BiLoo3Q",
+  "chana-masala": "https://www.youtube.com/watch?v=EL9X-P98m2Q",
+  "dal": "https://www.youtube.com/watch?v=3L0MZrLvyS0",
+  "veg-pulao": "https://www.youtube.com/watch?v=xMCHFpJsZ_c",
+  "mango-lassi": "https://www.youtube.com/watch?v=AMKoec4Ueo0",
+  "pad-thai": "https://www.youtube.com/watch?v=vDHlwnUEalQ",
+  "chicken-satay": "https://www.youtube.com/watch?v=9JzPXvV5c-I",
+  "yellow-curry": "https://www.youtube.com/watch?v=zJiNkOQ_vAM",
+  "pad-kra-pao": "https://www.youtube.com/watch?v=fYhTo_gb1G8",
+  "mango-sticky-rice": "https://www.youtube.com/watch?v=HoB9Uj1cdts",
+  "chicken-souvlaki": "https://www.youtube.com/watch?v=vmSnCeOeRO8",
+  "greek-salad": "https://www.youtube.com/watch?v=dxy_1DPcNdM",
+  "baked-falafel": "https://www.youtube.com/watch?v=ZzqJXWQjBW4",
+  "shakshuka": "https://www.youtube.com/watch?v=nVoOz0_zf-Q",
+  "lentil-soup": "https://www.youtube.com/watch?v=srnFEHpq184",
+
   "salmon-rice-bowl": "https://www.tiktok.com/@emilymariko/video/7010506729012219141",
   "rice-paper-dumplings": "https://www.tiktok.com/@okonomikitchen/video/7395975931912883461",
   "dumpling-lasagna": "https://www.tiktok.com/@myhealthydish/video/7600576064703728951",
@@ -423,13 +738,39 @@ const STARTER_VIDEOS = {
   "baked-feta-pasta": "https://www.tiktok.com/@grilledcheesesocial/video/6922946148760030469",
 };
 
+// The earlier starters that aren't Korean or American.
+const STARTER_CUISINES = {
+  spaghetti: "italian", "flatbread-pizza": "italian", "baked-feta-pasta": "italian",
+  "chicken-tacos": "mexican", "chicken-fajitas": "mexican", quesadillas: "mexican", "breakfast-burritos": "mexican",
+  "teriyaki-chicken": "japanese", "salmon-rice-bowl": "japanese",
+  "dumpling-lasagna": "chinese", "rice-paper-dumplings": "chinese",
+  "veggies-hummus": "mediterranean",
+};
+
 // batch: when a starter was added to the app. Families who use the starter menu
 // get each new batch once (see startersToAdd).
 export const STARTER_DISHES = [
   ...FIRST_STARTERS.map((dish) => ({ ...dish, batch: 1 })),
   ...MORE_STARTERS.map((dish) => ({ ...dish, batch: 2 })),
-].map((dish) => ({ ...dish, videoUrl: STARTER_VIDEOS[dish.seedKey] || "" }));
-export const LATEST_STARTER_BATCH = 2;
+  ...WORLD_STARTERS.map((dish) => ({ ...dish, batch: 3 })),
+].map((dish) => ({
+  ...dish,
+  cuisine: dish.cuisine || STARTER_CUISINES[dish.seedKey] || (dish.categories.includes("korean") ? "korean" : "american"),
+  videoUrl: STARTER_VIDEOS[dish.seedKey] || "",
+}));
+export const LATEST_STARTER_BATCH = 3;
+
+const CUISINE_KEYS = new Set(CUISINES.map((c) => c.key));
+const SEED_CUISINE = new Map(STARTER_DISHES.map((dish) => [dish.seedKey, dish.cuisine]));
+
+/**
+ * A dish's kind of food. Dishes saved before kinds existed get their starter
+ * recipe's kind, or Korean if they're tagged Korean.
+ */
+export function cuisineOf(dish) {
+  if (CUISINE_KEYS.has(dish?.cuisine)) return dish.cuisine;
+  return SEED_CUISINE.get(dish?.seedKey) || (dish?.categories?.includes("korean") ? "korean" : "other");
+}
 
 /**
  * The starters a family hasn't been given yet. starterBatch is the newest batch
@@ -438,14 +779,35 @@ export const LATEST_STARTER_BATCH = 2;
  * Dishes they already have (or deleted from an earlier batch) aren't returned.
  */
 export function startersToAdd({ starterBatch, haveSeedKeys }) {
-  const seen = starterBatch ?? (haveSeedKeys.size ? 1 : LATEST_STARTER_BATCH);
+  // No starter dishes at all: they said no to them (or removed every one).
+  if (!haveSeedKeys.size) return [];
+  const seen = starterBatch ?? 1;
   return STARTER_DISHES.filter((dish) => dish.batch > seen && !haveSeedKeys.has(dish.seedKey));
+}
+
+/**
+ * Starter dishes a family already has that can now get a video: ones with no
+ * video that nobody took a video off. Returns [{ id, videoUrl }].
+ */
+export function starterVideoFills(dishes) {
+  const bySeed = new Map(STARTER_DISHES.map((dish) => [dish.seedKey, dish]));
+  return dishes
+    .filter((dish) => dish.seedKey && !dish.videoUrl && !dish.videoRemoved && bySeed.get(dish.seedKey)?.videoUrl)
+    .map((dish) => ({ id: dish.id, videoUrl: bySeed.get(dish.seedKey).videoUrl }));
 }
 
 // Recipes by well-known cooks. Tapping "Add" has Claude read the page.
 // cuisine picks the Discover tab; note is what people who made it said.
 const korean = (by, list) => list.map(([name, nameKo, emoji, url, meal]) => ({ name, nameKo, emoji, by, url, meal, cuisine: "korean" }));
-const american = (by, list) => list.map(([name, emoji, url, meal]) => ({ name, nameKo: "", emoji, by, url, meal, cuisine: "american" }));
+const kind = (cuisine) => (by, list) => list.map(([name, emoji, url, meal]) => ({ name, nameKo: "", emoji, by, url, meal, cuisine }));
+const american = kind("american");
+const italian = kind("italian");
+const mexican = kind("mexican");
+const chinese = kind("chinese");
+const japanese = kind("japanese");
+const indian = kind("indian");
+const thai = kind("thai");
+const mediterranean = kind("mediterranean");
 
 export const DISCOVER = [
   // ---- 🔥 Trending: viral on TikTok and Instagram, and liked by people who made them ----
@@ -538,12 +900,7 @@ export const DISCOVER = [
     ["Mac and Cheese", "🧀", "https://www.onceuponachef.com/recipes/mac-and-cheese.html", "dinner"],
     ["Chili Mac", "🍝", "https://www.onceuponachef.com/recipes/chili-mac.html", "dinner"],
   ]),
-  ...american("Budget Bytes", [
-    ["Oven Fajitas", "🫑", "https://www.budgetbytes.com/oven-fajitas/", "dinner"],
-    ["Sheet Pan Tacos", "🌮", "https://www.budgetbytes.com/sheet-pan-tacos/", "dinner"],
-    ["BBQ Chicken Burrito Bowls", "🌯", "https://www.budgetbytes.com/bbq-chicken-burrito-bowls/", "dinner"],
-    ["Sheet Pan Sweet and Sour Chicken", "🍗", "https://www.budgetbytes.com/sheet-pan-sweet-sour-chicken/", "dinner"],
-  ]),
+
   ...american("Sally's Baking Addiction", [
     ["Banana Muffins", "🧁", "https://sallysbakingaddiction.com/banana-muffins/", "breakfast"],
     ["Blueberry Banana Muffins", "🫐", "https://sallysbakingaddiction.com/blueberry-banana-muffins/", "breakfast"],
@@ -551,5 +908,61 @@ export const DISCOVER = [
   ]),
   ...american("Super Healthy Kids", [
     ["Homemade Fish Sticks", "🐟", "https://www.superhealthykids.com/homemade-fish-sticks/", "dinner"],
+  ]),
+
+  // ---- 🇮🇹 Italian ----
+  ...italian("Inspired Taste", [
+    ["Flatbread Pizza", "🍕", "https://www.inspiredtaste.net/46230/flatbread-pizza/", "dinner"],
+  ]),
+
+  // ---- 🇲🇽 Mexican ----
+  ...mexican("Rick Bayless", [
+    ["Simple Guacamole for Tacos", "🥑", "https://www.rickbayless.com/recipe/simple-guacamole-for-tacos/", "snack"],
+  ]),
+  ...mexican("Budget Bytes", [
+    ["Oven Fajitas", "🫑", "https://www.budgetbytes.com/oven-fajitas/", "dinner"],
+    ["Sheet Pan Tacos", "🌮", "https://www.budgetbytes.com/sheet-pan-tacos/", "dinner"],
+    ["BBQ Chicken Burrito Bowls", "🌯", "https://www.budgetbytes.com/bbq-chicken-burrito-bowls/", "dinner"],
+  ]),
+
+  // ---- 🇨🇳 Chinese ----
+  ...chinese("Budget Bytes", [
+    ["Sheet Pan Sweet and Sour Chicken", "🍍", "https://www.budgetbytes.com/sheet-pan-sweet-sour-chicken/", "dinner"],
+  ]),
+
+  // ---- 🇯🇵 Japanese ----
+  ...japanese("Just One Cookbook", [
+    ["Chicken Teriyaki", "🍗", "https://www.justonecookbook.com/chicken-teriyaki/", "dinner"],
+    ["Oyakodon (Chicken & Egg Bowl)", "🍚", "https://www.justonecookbook.com/oyakodon/", "dinner"],
+    ["Gyudon (Beef Bowl)", "🍚", "https://www.justonecookbook.com/gyudon/", "dinner"],
+    ["Yaki Udon", "🍜", "https://www.justonecookbook.com/yaki-udon/", "lunch"],
+  ]),
+  ...japanese("RecipeTin Japan", [
+    ["Katsu Curry", "🍛", "https://japan.recipetineats.com/katsu-curry-japanese-curry-rice-with-chicken-cutlet/", "dinner"],
+  ]),
+
+  // ---- 🇮🇳 Indian ----
+  ...indian("Hebbars Kitchen", [
+    ["Dal Tadka (Yellow Dal)", "🥣", "https://hebbarskitchen.com/dal-tadka-recipe-yellow-dal-tadka/", "dinner"],
+    ["Chana Masala", "🫘", "https://hebbarskitchen.com/chana-masala-recipe-chickpea-masala/", "dinner"],
+    ["Veg Pulao", "🍚", "https://hebbarskitchen.com/veg-pulao-recipe-vegetable-pulao/", "lunch"],
+    ["Mango Lassi", "🥭", "https://hebbarskitchen.com/mango-lassi-recipe-aam-ki-lassi/", "snack"],
+  ]),
+
+  // ---- 🇹🇭 Thai ----
+  ...thai("Hot Thai Kitchen", [
+    ["Best Pad Thai", "🍜", "https://hot-thai-kitchen.com/best-pad-thai", "dinner"],
+    ["Yellow Curry Chicken", "🍛", "https://hot-thai-kitchen.com/yellow-curry-chicken/", "dinner"],
+    ["Pad Kra Pao (Basil Stir-Fry)", "🌿", "https://hot-thai-kitchen.com/pad-kra-pao-anything", "dinner"],
+    ["Mango Sticky Rice", "🥭", "https://hot-thai-kitchen.com/mango-sticky-rice/", "snack"],
+  ]),
+  ...thai("Marion's Kitchen", [
+    ["Chicken Pad Thai", "🍜", "https://www.marionskitchen.com/chicken-pad-thai", "dinner"],
+  ]),
+
+  // ---- 🫒 Mediterranean ----
+  ...mediterranean("The Mediterranean Dish", [
+    ["Shakshuka", "🍳", "https://www.themediterraneandish.com/shakshuka-recipe/", "breakfast"],
+    ["Turkish Red Lentil Soup", "🥣", "https://www.themediterraneandish.com/turkish-lentil-soup/", "lunch"],
   ]),
 ];

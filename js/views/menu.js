@@ -1,13 +1,14 @@
 // Menu: every dish the family has, as big picture tiles. Discover: recipes
 // from Seonkyoung Longest and other well-known cooks, added with one tap.
 import { h, clearChildren, toast } from "../ui.js";
-import { MEALS, CATEGORIES, DISCOVER } from "../seed.js";
+import { MEALS, CATEGORIES, CUISINES, DISCOVER, cuisineOf } from "../seed.js";
 import { isFavorite } from "../planner.js";
 import { state, dishList, rating, go } from "../store.js";
 import { dishTile, backHeader, needKeySheet } from "../components.js";
 import { runImport } from "./add.js";
 
 let lastFilter = "all";
+let lastKind = "all";
 let lastQuery = "";
 
 const FILTERS = [
@@ -16,25 +17,62 @@ const FILTERS = [
   ...MEALS.map((m) => ({ key: m.key, emoji: m.emoji, label: m.key === "snack" ? "Snacks" : m.label })),
 ];
 
-// Words a dish can be found by: its names, ingredients and kinds ("Korean", "Soups"…).
+// Words a dish can be found by: its names, ingredients and kinds ("Italian", "Soups"…).
 function searchText(d) {
   const kinds = (d.categories || []).map((c) => CATEGORIES.find((x) => x.key === c)?.label || c);
-  return [d.name, d.nameKo, d.description, ...kinds, ...(d.ingredients || [])].join(" ").toLowerCase();
+  const cuisine = CUISINES.find((c) => c.key === cuisineOf(d))?.label;
+  return [d.name, d.nameKo, d.description, cuisine, ...kinds, ...(d.ingredients || [])].join(" ").toLowerCase();
+}
+
+/**
+ * A row of flag buttons to swipe through: one per kind of food, and "All kinds"
+ * unless all is false. It updates itself in place, so it keeps its scroll spot.
+ */
+function kindRow(kinds, current, onpick, { all = true } = {}) {
+  const row = h("div.kinds", { role: "group", "aria-label": "Kind of food" });
+  const pick = (key) => {
+    for (const b of row.children) {
+      const on = b.dataset.kind === key;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    onpick(key);
+  };
+  for (const k of [...(all ? [{ key: "all", emoji: "🌍", label: "All kinds" }] : []), ...kinds]) {
+    row.append(h(`button.kind${current === k.key ? ".on" : ""}`, {
+      dataset: { kind: k.key },
+      "aria-pressed": current === k.key ? "true" : "false",
+      onclick: () => pick(k.key),
+    }, h("span.kind-emoji", k.emoji), k.label));
+  }
+  // Show the chosen kind even when it's far along the row.
+  requestAnimationFrame(() => {
+    const on = row.querySelector(".kind.on");
+    if (on) row.scrollLeft = on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2;
+  });
+  return row;
 }
 
 export function viewMenu({ params }) {
   let filter = FILTERS.some((f) => f.key === params.get("c")) ? params.get("c") : lastFilter;
   let query = lastQuery;
+  // Only the kinds of food we actually have dishes for.
+  const present = new Set(dishList().map(cuisineOf));
+  const kinds = CUISINES.filter((c) => present.has(c.key));
+  let kind = kinds.some((k) => k.key === lastKind) ? lastKind : "all";
   const grid = h("div.tile-grid");
   const filters = h("div.filters");
+  const kindsBox = kinds.length > 1 ? kindRow(kinds, kind, (k) => { kind = k; draw(); }) : null;
 
   const matches = (d) => {
+    if (kind !== "all" && cuisineOf(d) !== kind) return false;
     if (filter === "fav") return isFavorite(d);
     if (filter !== "all") return (d.meals || []).includes(filter);
     return true;
   };
   const draw = () => {
     lastFilter = filter;
+    lastKind = kind;
     lastQuery = query;
     clearChildren(filters);
     for (const f of FILTERS) {
@@ -67,7 +105,9 @@ export function viewMenu({ params }) {
       h("h1", "📖 Menu"),
       h("button.btn.primary", { onclick: () => go("#/add") }, "➕ Add"),
     ),
+    h("button.btn.soft.wide.fridge-btn", { onclick: () => go("#/fridge") }, "🧊 What can we make with what we have?"),
     filters,
+    kindsBox,
     h("input.search", {
       type: "search",
       value: query,
@@ -79,18 +119,20 @@ export function viewMenu({ params }) {
   );
 }
 
-const CUISINES = [
-  { key: "trending", emoji: "🔥", label: "Trending", intro: "Viral on TikTok and Instagram, and liked by the people who made them at home." },
-  { key: "korean", emoji: "🇰🇷", label: "Korean", intro: "Healthy family Korean food from famous home cooks." },
-  { key: "american", emoji: "🇺🇸", label: "American", intro: "Family dinners, muffins and snacks from trusted recipe sites." },
-];
+const TRENDING = { key: "trending", emoji: "🔥", label: "Trending" };
+const INTROS = {
+  trending: "Viral on TikTok and Instagram, and liked by the people who made them at home.",
+  korean: "Healthy family Korean food from famous home cooks.",
+  american: "Family dinners, muffins and snacks from trusted recipe sites.",
+};
 let lastCuisine = "trending";
 
 export function viewDiscover() {
   const key = (url) => String(url || "").toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[/?#]+$/, "");
   const have = new Set(dishList().flatMap((d) => [key(d.sourceUrl), key(d.videoUrl)]).filter(Boolean));
-  const tabs = h("div.filters.three");
   const intro = h("p.muted");
+  const kinds = [TRENDING, ...CUISINES].filter((c) => DISCOVER.some((r) => r.cuisine === c.key));
+  if (!kinds.some((k) => k.key === lastCuisine)) lastCuisine = "trending";
   const list = h("div.stack");
 
   const item = (r) => h("div.discover-item",
@@ -112,14 +154,8 @@ export function viewDiscover() {
   );
 
   const draw = () => {
-    clearChildren(tabs);
-    for (const c of CUISINES) {
-      tabs.append(h(`button.filter${lastCuisine === c.key ? ".on" : ""}`, {
-        "aria-pressed": lastCuisine === c.key ? "true" : "false",
-        onclick: () => { lastCuisine = c.key; draw(); },
-      }, h("span.filter-emoji", c.emoji), c.label));
-    }
-    intro.textContent = CUISINES.find((c) => c.key === lastCuisine).intro;
+    const current = kinds.find((c) => c.key === lastCuisine);
+    intro.textContent = INTROS[lastCuisine] || `${current.label} family favorites from well-known cooks.`;
     clearChildren(list);
     const groups = new Map();
     for (const r of DISCOVER.filter((d) => d.cuisine === lastCuisine)) {
@@ -134,6 +170,7 @@ export function viewDiscover() {
       }
     }
   };
+  const tabs = kindRow(kinds, lastCuisine, (k) => { lastCuisine = k; draw(); }, { all: false });
   draw();
 
   return h("div.screen.discover",

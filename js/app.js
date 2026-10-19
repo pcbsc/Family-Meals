@@ -10,6 +10,7 @@ import { viewDish, viewCook } from "./views/dish.js";
 import { viewAdd, viewEdit } from "./views/add.js";
 import { viewShop } from "./views/shop.js";
 import { viewSettings, viewWelcome } from "./views/settings.js";
+import { viewFridge } from "./views/fridge.js";
 
 // full: hides the tab bar. still: background refreshes don't redraw it (so
 // cook-along keeps its place when a rating sheet closes).
@@ -18,6 +19,7 @@ const ROUTES = [
   { re: /^\/week$/, view: viewWeek, tab: "week" },
   { re: /^\/menu$/, view: viewMenu, tab: "menu" },
   { re: /^\/discover$/, view: viewDiscover, tab: "menu" },
+  { re: /^\/fridge$/, view: viewFridge, tab: "menu" },
   { re: /^\/dish\/([^/]+)$/, view: viewDish, tab: "menu" },
   { re: /^\/cook\/([^/]+)$/, view: viewCook, full: true, still: true },
   { re: /^\/add$/, view: viewAdd, tab: "menu", still: true },
@@ -130,9 +132,10 @@ async function start() {
   if (!location.hash) history.replaceState(null, "", "#/today");
   state.navCount = 1;
   // New starter recipes from an app update go in before the first screen draws.
-  const newStarters = await addNewStarters().catch((err) => (console.error(err), 0));
+  const fresh = await addNewStarters().catch((err) => (console.error(err), { added: 0, videos: 0 }));
   render();
-  if (newStarters) toast(`${newStarters} new recipes are on the menu, with videos for the trending ones!`, { emoji: "🔥", ms: 5000 });
+  if (fresh.added) toast(`${fresh.added} new recipes are on the menu, with cooking videos!`, { emoji: "🔥", ms: 5000 });
+  else if (fresh.videos) toast(`${fresh.videos} of our dishes now have a cooking video.`, { emoji: "📺", ms: 5000 });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
 

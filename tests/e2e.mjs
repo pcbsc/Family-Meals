@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { Buffer } from "node:buffer";
-import { STARTER_DISHES } from "../js/seed.js";
+import { STARTER_DISHES, LATEST_STARTER_BATCH } from "../js/seed.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const TYPES = {
@@ -141,8 +141,30 @@ await check("first run sets up the family and the starter menu", async () => {
   await page.locator(".tabbar a[data-tab=menu]").click();
   await page.locator(".tile").first().waitFor();
   assert.equal(await page.locator(".tile").count(), STARTER_DISHES.length);
-  // The trending dishes come with their creators' videos.
+  // Nearly every starter comes with a cooking video.
   assert.equal(await page.locator(".tile-video").count(), STARTER_DISHES.filter((d) => d.videoUrl).length);
+});
+
+await check("the menu filters by kind of food", async () => {
+  const italian = STARTER_DISHES.filter((d) => d.cuisine === "italian").length;
+  await page.locator(".kind", { hasText: "Italian" }).click();
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator(".tile").count(), italian);
+  await page.getByText("Classic Lasagna").waitFor();
+  // Kinds and meals work together: Italian lunches only.
+  await page.locator(".filter", { hasText: "Lunch" }).click();
+  assert.equal(await page.locator(".tile").count(), STARTER_DISHES.filter((d) => d.cuisine === "italian" && d.meals.includes("lunch")).length);
+  await page.locator(".filter", { hasText: "All" }).first().click();
+  // A kind far along the row stays in view after it's picked.
+  await page.locator(".kind", { hasText: "Mediterranean" }).click();
+  await page.waitForTimeout(100);
+  assert.ok(await page.locator(".kinds").evaluate((row) => row.scrollLeft > 0), "the row kept its place");
+  await page.locator(".kinds").evaluate((row) => (row.scrollLeft = 0));
+  await page.locator(".kind", { hasText: "All kinds" }).click();
+  assert.equal(await page.locator(".tile").count(), STARTER_DISHES.length);
+  await page.goto(BASE + "#/dish/seed-pad-thai");
+  await page.locator(".fact", { hasText: "Thai" }).waitFor();
+  await page.goto(BASE + "#/menu");
 });
 
 await check("families on an older version get the new starter recipes, once", async () => {
@@ -152,6 +174,9 @@ await check("families on an older version get the new starter recipes, once", as
     // Like a family from before: only the first batch, minus one they deleted.
     for (const d of all.filter((x) => x.batch > 1)) await store.deleteDish(`seed-${d.seedKey}`);
     await store.deleteDish("seed-apple-pb");
+    // Their starters had no videos then, and they'd taken one off on purpose.
+    for (const d of store.dishList()) await store.updateDish(d.id, { videoUrl: undefined });
+    await store.updateDish("seed-kimbap", { videoUrl: "", videoRemoved: true });
     await store.saveSettings({ starterBatch: undefined });
     return store.state.dishes.size;
   });
@@ -159,11 +184,16 @@ await check("families on an older version get the new starter recipes, once", as
   await page.locator(".toast", { hasText: "new recipes are on the menu" }).waitFor();
   const after = await page.evaluate(async () => {
     const { state } = await import("./js/store.js");
-    return { size: state.dishes.size, deletedBack: state.dishes.has("seed-apple-pb"), batch: state.settings.starterBatch };
+    return {
+      size: state.dishes.size, deletedBack: state.dishes.has("seed-apple-pb"), batch: state.settings.starterBatch,
+      bulgogiVideo: state.dishes.get("seed-bulgogi").videoUrl, kimbapVideo: state.dishes.get("seed-kimbap").videoUrl,
+    };
   });
   assert.equal(after.size, before + STARTER_DISHES.filter((d) => d.batch > 1).length);
   assert.equal(after.deletedBack, false, "a starter they deleted stays deleted");
-  assert.equal(after.batch, 2);
+  assert.equal(after.batch, LATEST_STARTER_BATCH);
+  assert.equal(after.bulgogiVideo, STARTER_DISHES.find((d) => d.seedKey === "bulgogi").videoUrl, "their starters got videos");
+  assert.equal(after.kimbapVideo, "", "a video they took off stays off");
   await page.reload();
   await page.locator(".tile").first().waitFor();
   await page.waitForTimeout(300);
@@ -176,10 +206,12 @@ await check("Discover has trending, Korean and American ideas, with what testers
   await page.getByText("worth the hype").first().waitFor();
   // The salmon bowl is already a starter with the same TikTok.
   await page.locator(".discover-item", { hasText: "Salmon Rice Bowl" }).getByText("In menu").waitFor();
-  await page.locator(".filter", { hasText: "Korean" }).click();
+  await page.locator(".kind", { hasText: "Korean" }).click();
   await page.getByRole("heading", { name: "Seonkyoung Longest" }).waitFor();
   await page.getByText("Jjajangmyeon").first().waitFor();
-  await page.locator(".filter", { hasText: "American" }).click();
+  await page.locator(".kind", { hasText: "Italian" }).click();
+  await page.getByText("Flatbread Pizza").waitFor();
+  await page.locator(".kind", { hasText: "American" }).click();
   await page.getByRole("heading", { name: "Natasha's Kitchen" }).waitFor();
   assert.equal(await page.getByText("Salmon Rice Bowl").count(), 0);
 });
@@ -219,7 +251,7 @@ await check("cook-along keeps the video on screen while the steps change", async
 });
 
 await check("a grown-up can paste a video link onto any dish, and take it off", async () => {
-  await page.goto(BASE + "#/dish/seed-bulgogi");
+  await page.goto(BASE + "#/dish/seed-gamja-jorim");
   await page.getByText("📺 Add a video").click();
   await sheet().getByLabel("Video link").fill("https://seonkyounglongest.com/bulgogi/");
   await sheet().getByText("Save this video").click();
@@ -260,7 +292,7 @@ await check("cook-along shows steps with timers and no stray text", async () => 
   await page.getByText("Start 30 minutes timer").click();
   await page.locator(".timer-pill").waitFor();
   await page.locator(".timer-pill [aria-label='Stop timer']").click();
-  await page.locator(".cook-top .icon-btn").click();
+  await page.getByLabel("Stop cooking").click();
   await page.locator(".dish-title").waitFor();
 });
 
@@ -304,7 +336,7 @@ await check("Claude finds a video, and only one its search really found", async 
       { type: "tool_use", id: "toolu_v1", name: "save_video", input: { found: true, url: "https://www.youtube.com/watch?v=MadeUpVid01", channel: "Nobody", problem: "" } },
     ], "tool_use")
     : sse([{ type: "tool_use", id: "toolu_v2", name: "save_video", input: { found: true, url: "https://www.youtube.com/watch?v=i1djfV9uigc", channel: "Maangchi", problem: "" } }], "tool_use");
-  await page.goto(BASE + "#/dish/seed-tteokguk");
+  await page.goto(BASE + "#/dish/seed-hobak-jeon");
   await page.getByText("📺 Add a video").click();
   await sheet().getByText("Find one for me").click();
   await page.getByText("Found one from Maangchi!").waitFor();
@@ -576,6 +608,43 @@ await check("a half-typed recipe survives switching tabs", async () => {
   assert.equal(await page.getByPlaceholder("Grandma's Japchae").inputValue(), "Half Done Bibimbap");
   await page.getByText("Start over").click();
   assert.equal(await page.getByPlaceholder("Grandma's Japchae").inputValue(), "");
+});
+
+await check("what can we make: tap what we have, see what's ready and what's nearly there", async () => {
+  await page.goto(BASE + "#/menu");
+  await page.getByText("What can we make with what we have?").click();
+  await page.getByText("Tell us what's in the fridge").waitFor();
+  await page.getByRole("button", { name: "🥚 eggs" }).click();
+  await page.getByRole("button", { name: "🍅 tomatoes" }).click();
+  await page.getByLabel("Add what we have").fill("scallions, rice");
+  await page.getByLabel("Add what we have").press("Enter");
+  await page.locator(".have-chip", { hasText: "rice" }).waitFor();
+  const ready = page.locator("section", { hasText: "Ready to cook" });
+  await ready.locator(".tile", { hasText: "Tomato & Egg Stir-Fry" }).waitFor();
+  const almost = page.locator(".almost").first();
+  await almost.waitFor();
+  assert.match(await almost.textContent(), /Need: /);
+  await almost.getByRole("button", { name: /to the shopping list/ }).click();
+  await page.locator(".toast", { hasText: "to the shopping list" }).waitFor();
+  // What we have is remembered.
+  await page.reload();
+  await page.locator(".have-chip", { hasText: "eggs" }).waitFor();
+  await page.getByRole("button", { name: "Remove eggs" }).click();
+  await page.locator(".have-chip", { hasText: "eggs" }).waitFor({ state: "detached" });
+});
+
+await check("a recipe can go on the shopping list, combined with everything else", async () => {
+  await page.goto(BASE + "#/dish/seed-lasagna");
+  await page.getByText("Add to shopping list").click();
+  await page.locator(".toast", { hasText: "On the shopping list" }).waitFor();
+  await page.locator(".tabbar a[data-tab=shop]").click();
+  const chip = page.getByRole("button", { name: "Take Classic Lasagna off the list" });
+  await chip.waitFor();
+  await page.locator(".shop-item", { hasText: "Ricotta cheese" }).waitFor();
+  // Things the plan and the lasagna both need are one line, not two.
+  assert.equal(await page.locator(".shop-item", { hasText: /^✓?Ground beef/ }).count() <= 1, true);
+  await chip.click();
+  await page.locator(".shop-item", { hasText: "Ricotta cheese" }).waitFor({ state: "detached" });
 });
 
 await check("the shopping list merges the week and remembers ticks", async () => {

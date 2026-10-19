@@ -4,12 +4,12 @@ import {
   h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
   minutesText, clearChildren, openSheet,
 } from "../ui.js";
-import { SPICE } from "../seed.js";
+import { SPICE, CUISINES, cuisineOf } from "../seed.js";
 import { scaleIngredient, parseIngredient, findTimers, cleanLink } from "../recipe.js";
 import { dateKey } from "../planner.js";
 import { videoInfo } from "../video.js";
 import {
-  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh,
+  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh, addRecipeToShopping,
 } from "../store.js";
 import {
   grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet,
@@ -139,7 +139,7 @@ async function findVideoFlow(dish) {
     });
     await progress.close();
     if (!result.found) return toast(result.problem, { emoji: "🤷", ms: 5000 });
-    await updateDish(dish.id, { videoUrl: result.url, videoFound: true });
+    await updateDish(dish.id, { videoUrl: result.url, videoFound: true, videoRemoved: false });
     toast(result.channel ? `Found one from ${result.channel}!` : "Found a video!", { emoji: "📺", ms: 3500 });
     refresh();
   } catch (err) {
@@ -157,7 +157,7 @@ async function videoSheet(dish) {
   openSheet((close) => {
     const save = async () => {
       if (!videoInfo(typed)) return toast("That isn't a YouTube, TikTok or Instagram video link.", { emoji: "🤔", ms: 4000 });
-      await updateDish(dish.id, { videoUrl: cleanLink(typed.trim()), videoFound: false });
+      await updateDish(dish.id, { videoUrl: cleanLink(typed.trim()), videoFound: false, videoRemoved: false });
       await close();
       toast("Video added!", { emoji: "📺" });
       refresh();
@@ -174,7 +174,8 @@ async function videoSheet(dish) {
       dish.videoUrl
         ? h("button.btn.ghost.danger-text", {
           onclick: async () => {
-            await updateDish(dish.id, { videoUrl: "", videoFound: false });
+            // Remembered, so an app update doesn't put a starter video back.
+            await updateDish(dish.id, { videoUrl: "", videoFound: false, videoRemoved: true });
             await close();
             toast("Video removed.", { emoji: "🗑️" });
             refresh();
@@ -208,6 +209,7 @@ export function viewDish({ match }) {
   };
   drawIngredients();
   const total = (dish.prepMinutes || 0) + (dish.cookMinutes || 0);
+  const cuisine = CUISINES.find((c) => c.key === cuisineOf(dish) && c.key !== "other");
 
   return h("div.screen.dish",
     backHeader(null, {
@@ -224,6 +226,7 @@ export function viewDish({ match }) {
       dish.description ? h("p.desc", dish.description) : null,
     ),
     h("div.facts",
+      cuisine ? h("span.fact", cuisine.emoji, " ", cuisine.label) : null,
       total ? h("span.fact", "⏱️ ", minutesText(total)) : null,
       h("span.fact", dish.spicy ? "🌶️".repeat(dish.spicy) + " " : "😊 ", SPICE[dish.spicy || 0]),
     ),
@@ -252,6 +255,14 @@ export function viewDish({ match }) {
         })),
       ),
       dish.ingredients.length ? list : h("p.muted", "No ingredients yet."),
+      dish.ingredients.length
+        ? h("button.btn.soft.wide", {
+          onclick: async () => {
+            await addRecipeToShopping(dish.id, servings);
+            toast(`On the shopping list, for ${servings} people.`, { emoji: "🛒" });
+          },
+        }, "🛒 Add to shopping list")
+        : null,
     ),
     h("section.card",
       h("h2", "👣 Steps"),

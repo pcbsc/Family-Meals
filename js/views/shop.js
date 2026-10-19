@@ -1,5 +1,6 @@
-// Shopping list: built from the week's plan, merged and sorted by aisle.
-// Tick things off in the store, add extras, or send the list to a phone.
+// Shopping list: the week's plan plus any recipes added from their pages, merged
+// into one list sorted by aisle. Tick things off in the store, add extras, or
+// send the list to a phone.
 import { h, toast, clearChildren, prettyDate } from "../ui.js";
 import { buildGroceryList, AISLES } from "../recipe.js";
 import { dateKey, fromKey, addDays, weekStart, weekDays } from "../planner.js";
@@ -14,7 +15,7 @@ export function viewShop({ params }) {
   const onlyAhead = weekKey <= today && today <= dateKey(addDays(start, 6));
   const body = h("div.stack");
 
-  const entries = () => {
+  const fromPlan = () => {
     const out = [];
     for (const day of weekDays(start)) {
       if (onlyAhead && dateKey(day) < today) continue;
@@ -24,12 +25,17 @@ export function viewShop({ params }) {
     }
     return out;
   };
+  // Recipes added with "Add to shopping list" (skipping any deleted since).
+  const added = (shop) => (shop.recipes || [])
+    .map((r) => ({ dish: state.dishes.get(r.dishId), servings: r.servings }))
+    .filter((r) => r.dish);
 
   const draw = () => {
     clearChildren(body);
     const shop = shoppingFor(weekKey);
-    const planned = entries();
-    const items = buildGroceryList(planned);
+    const planned = fromPlan();
+    const extraRecipes = added(shop);
+    const items = buildGroceryList([...planned, ...extraRecipes]);
     const toggle = async (key) => {
       const checked = { ...shop.checked };
       checked[key] ? delete checked[key] : (checked[key] = true);
@@ -50,11 +56,30 @@ export function viewShop({ params }) {
       );
     };
 
-    if (!planned.length && !shop.extras.length) {
+    if (!planned.length && !extraRecipes.length && !shop.extras.length) {
       body.append(h("div.empty-state",
         h("div.huge-emoji", "🪄"),
-        h("p", "Plan some meals and the list makes itself!"),
+        h("p", "Plan some meals, or tap \"Add to shopping list\" on a recipe, and the list makes itself!"),
         h("button.btn.primary", { onclick: () => go(`#/week?w=${weekKey}`) }, "📅 Plan the week"),
+      ));
+    }
+    if (planned.length || extraRecipes.length) {
+      // What the list is for: one line per dish, however many times it's planned.
+      const counts = new Map();
+      for (const p of planned) counts.set(p.dish.id, { dish: p.dish, times: (counts.get(p.dish.id)?.times || 0) + 1 });
+      body.append(h("section.card.list-for",
+        h("h2", `📖 For ${counts.size + extraRecipes.length} dish${counts.size + extraRecipes.length === 1 ? "" : "es"}`),
+        h("p.muted", `${items.filter((i) => !i.pantry).length} things to buy, everything combined and sorted by aisle.`),
+        h("div.row.wrap",
+          [...counts.values()].map(({ dish, times }) => h("span.chip.static", `📅 ${dish.name}${times > 1 ? ` ×${times}` : ""}`)),
+          extraRecipes.map(({ dish, servings }) => h("button.chip.on", {
+            "aria-label": `Take ${dish.name} off the list`,
+            onclick: async () => {
+              await saveShopping({ ...shop, recipes: shop.recipes.filter((r) => r.dishId !== dish.id) });
+              draw();
+            },
+          }, `🛒 ${dish.name} (${servings}) ✕`)),
+        ),
       ));
     }
 

@@ -163,18 +163,18 @@ const SYNONYMS = [
 function singular(word) {
   if (/(ss|us|is)$/.test(word) || word.length < 4) return word;
   if (/ies$/.test(word)) return word.slice(0, -3) + "y";
-  if (/(tomato|potato)es$/.test(word)) return word.slice(0, -2);
+  if (/(tomato|potato|mango)es$/.test(word)) return word.slice(0, -2);
   if (/(ch|sh|x)es$/.test(word)) return word.slice(0, -2);
   if (/s$/.test(word) && !/(leaves|sprouts|noodles|oats|greens|flakes|seeds|chips|crumbs)$/.test(word)) return word.slice(0, -1);
   return word;
 }
 
-/** "2 large Yellow Onions (about 1 lb), diced" → "yellow onion" */
 // Words that describe a food rather than name one, for "X or Y food" lines.
 const DESCRIBING = new Set(("soft medium firm silken plain vanilla greek fresh frozen dried canned low-sodium korean persian " +
   "english japanese red green yellow white brown sweet unsalted salted whole light dark pizza marinara tomato regular " +
   "large small baby thin thick boneless skinless").split(" "));
 
+/** "2 large Yellow Onions (about 1 lb), diced" → "yellow onion" */
 export function normalizeItemName(item) {
   let s = String(item || "").toLowerCase();
   s = s.replace(/\([^)]*\)/g, " ").split(/,| - | – |;/)[0];
@@ -204,13 +204,13 @@ export const AISLES = [
 const AISLE_WORDS = [
   ["frozen", /\bfrozen\b/],
   // Checked before the meat and produce words they contain ("chicken broth", "garlic powder").
-  ["pantry", /broth|\bstock\b|powder|peanut butter|sunflower butter|almond butter|\bdried (italian )?(thyme|oregano|basil|parsley|rosemary|dill|herbs?)\b|italian (herbs?|seasoning)|bay lea|canned|marinara|pizza sauce|tomato sauce|tomato paste|crushed tomato|sun-dried|starch|worcestershire/],
-  ["asian", /tofu|kimchi|gochujang|doenjang|gochugaru|fish sauce|mirin|rice wine|rice cake|tteok|dangmyeon|glass noodle|sweet potato noodle|seaweed|\bgim\b|miyeok|nori|dashima|kelp|anchov|soup soy|oyster sauce|perilla|danmuji|pickled radish|eomuk|fish cake|sesame oil|korean radish|rice vinegar|plum extract|corn syrup|oligo|jjajang|udon|black bean paste|chunjang|jujube|ginseng|chili crisp|chili oil|rice paper|dumpling wrapper|wonton wrapper|yubu|tofu pocket/],
+  ["pantry", /broth|\bstock\b|powder|peanut butter|sunflower butter|almond butter|\bdried (italian )?(thyme|oregano|basil|parsley|rosemary|dill|herbs?)\b|italian (herbs?|seasoning)|bay lea|canned|marinara|pizza sauce|enchilada|tomato sauce|tomato paste|crushed tomato|sun-dried|starch|worcestershire/],
+  ["asian", /tofu|kimchi|gochujang|doenjang|gochugaru|fish sauce|mirin|rice wine|rice cake|tteok|dangmyeon|glass noodle|sweet potato noodle|seaweed|\bgim\b|miyeok|nori|dashima|kelp|anchov|soup soy|oyster sauce|perilla|danmuji|pickled radish|eomuk|fish cake|sesame oil|korean radish|rice vinegar|plum extract|corn syrup|oligo|jjajang|udon|black bean paste|chunjang|jujube|ginseng|\bdashi\b|miso|curry roux|curry paste|tamarind|coconut (milk|cream)|chili crisp|chili oil|rice paper|dumpling wrapper|wonton wrapper|yubu|tofu pocket/],
   ["meat", /beef|pork|chicken|turkey|ribeye|sirloin|short rib|brisket|bacon|sausage|\bham\b|pepperoni|salami|salmon|mackerel|\bfish\b|\bcod\b|shrimp|prawn|squid|clam|mussel|steak|lamb|drumstick|imitation crab|\bhens?\b/],
-  ["grains", /\brice\b|noodle|pasta|spaghetti|macaroni|bread|tortilla|\bflour\b|oats|oatmeal|flatbread|pita|naan|pizza dough|cereal|granola|\bbuns?\b|bagel|cracker/],
-  ["dairy", /\beggs?\b|milk|half-and-half|butter|cheese|yogurt|yoghurt|cream|mozzarella|parmesan|cheddar|hummus/],
+  ["grains", /\brice\b|noodle|pasta|spaghetti|macaroni|fettuccine|penne|bread|tortilla|\bflour\b|oats|oatmeal|flatbread|pita|naan|pizza dough|cereal|granola|\bbuns?\b|bagel|cracker/],
+  ["dairy", /\beggs?\b|milk|half-and-half|butter|ghee|cheese|feta|yogurt|yoghurt|cream|mozzarella|parmesan|cheddar|hummus/],
   ["produce", /onion|garlic|ginger|carrot|spinach|zucchini|squash|potato|cabbage|lettuce|cucumber|tomato|pepper(?!corn)|jalape|\bchil(?:i|e)s?\b|mushroom|sprout|radish|apple|banana|berr|lemon|lime|orange|avocado|cilantro|parsley|basil|broccoli|celery|pear|fruit|kale|corn|\bpeas?\b|chive|herb|grape|melon|mango|peach|kiwi|eggplant|asparagus|green bean|bok choy|napa|leek|shallot|scallion|thyme|rosemary|mint|dill/],
-  ["pantry", /\boil\b|sugar|\bsalt\b|soy sauce|vinegar|honey|sesame seed|spice|cumin|paprika|oregano|cinnamon|vanilla|syrup|ketchup|mustard|mayo|cornstarch|starch|bouillon|salsa|beans|tuna|nut|raisin|chocolate|jam|seasoning|baking|\bbeans?\b|chickpea|lentil|almond|yeast|sriracha/],
+  ["pantry", /\boil\b|sugar|\bsalt\b|soy sauce|vinegar|honey|sesame seed|spice|cumin|paprika|oregano|cinnamon|vanilla|syrup|ketchup|mustard|mayo|cornstarch|starch|bouillon|salsa|beans|tuna|nut|raisin|chocolate|jam|seasoning|baking|\bbeans?\b|chickpea|lentil|almond|yeast|sriracha|masala|turmeric|coriander|cardamom|\bolives?\b/],
 ];
 
 /** Things most kitchens already have; the list shows them apart so nobody buys a fifth bottle of soy sauce. */
@@ -276,7 +276,7 @@ export function buildGroceryList(entries) {
       const p = parseIngredient(line);
       if (p.header || !p.item) continue;
       const key = normalizeItemName(p.item);
-      if (!key || /^(water|ice|cold water|hot water|warm water|boiling water)$/.test(key)) continue;
+      if (!key || /^(water|ice|ice cube|cold water|hot water|warm water|boiling water)$/.test(key)) continue;
       let entry = byKey.get(key);
       if (!entry) {
         entry = {
@@ -415,4 +415,67 @@ export function parseRecipeText(text) {
     else if (cleaned.length > 40) steps.push(cleaned);
   }
   return { name, servings, ingredients, steps };
+}
+
+// ---------- What can we make? ----------
+
+// Basics most kitchens have, which "What can I make?" doesn't ask about.
+const SEASONING = /\b(spice|seasoning|powder|masala|turmeric|cumin|paprika|oregano|thyme|rosemary|bay lea|cinnamon|cardamom|coriander|seeds?|extract|dried herbs?|italian herbs?|chili flakes|red pepper flakes|sauce|ketchup|mustard|mayonnaise|honey|syrup|vinegar|oil|sugar|starch|broth|stock|bouillon|yeast|baking)\b/;
+// Foods named by a part: "chicken" means you have chicken thighs, breasts, tenders…
+const WHOLE_FOODS = new Set(["chicken", "beef", "pork", "turkey", "lamb", "salmon", "fish", "shrimp", "tofu", "egg", "ham", "bacon", "sausage", "mushroom", "potato", "tomato"]);
+// Words that cover a family of things on a recipe.
+const FAMILIES = {
+  beef: ["ribeye", "sirloin", "brisket", "short rib", "flank steak", "steak", "chuck"],
+  cheese: ["cheese", "mozzarella", "cheddar", "parmesan", "feta", "ricotta", "cotija"],
+  pasta: ["pasta", "spaghetti", "fettuccine", "macaroni", "penne", "fusilli", "lasagna noodle", "ditalini"],
+  noodle: ["noodle", "udon", "somyeon", "spaghetti"],
+  bread: ["bread", "bun", "pita", "naan", "toast"],
+  fish: ["fish", "salmon", "cod", "mackerel", "tuna"],
+  greens: ["spinach", "lettuce", "cabbage", "kale", "bok choy"],
+};
+
+function haveCovers(have, need) {
+  if (have === need) return true;
+  const hw = have.split(" ");
+  const nw = need.split(" ");
+  // "rice" covers "short-grain rice"; "red onion" covers "red onion"
+  if (hw.at(-1) === nw.at(-1) && hw.every((w) => nw.includes(w))) return true;
+  if (WHOLE_FOODS.has(have) && nw.includes(have)) return true;
+  return (FAMILIES[have] || []).some((f) => need === f || need.endsWith(` ${f}`));
+}
+
+/** The ingredients worth asking about for a dish (not salt, oil, sauces, spices or garnishes). */
+export function keyIngredients(dish) {
+  const out = new Set();
+  for (const line of dish?.ingredients || []) {
+    const p = parseIngredient(line);
+    if (p.header || !p.item) continue;
+    if (/\boptional\b|\bfor (serving|topping|garnish|dipping|the top)\b|\bto taste\b/i.test(line)) continue;
+    const key = normalizeItemName(p.item);
+    if (!key || /^(water|ice|ice cube)$|water$/.test(key) || isPantryStaple(key) || SEASONING.test(key)) continue;
+    out.add(key);
+  }
+  return out;
+}
+
+/**
+ * Which dishes can be made with what we have. Returns the dishes that use at
+ * least one thing we have, best first: [{ dish, missing: [names], have: n, need: n }].
+ */
+export function whatCanIMake(dishes, haveList) {
+  const haves = [...new Set((haveList || []).map((x) => normalizeItemName(x)).filter(Boolean))];
+  if (!haves.length) return [];
+  const out = [];
+  for (const dish of dishes) {
+    const need = keyIngredients(dish);
+    if (!need.size) continue;
+    const missing = [];
+    let have = 0;
+    for (const key of need) {
+      if (haves.some((h) => haveCovers(h, key))) have++;
+      else missing.push(key);
+    }
+    if (have) out.push({ dish, missing, have, need: need.size });
+  }
+  return out.sort((a, b) => a.missing.length - b.missing.length || b.have - a.have || a.dish.name.localeCompare(b.dish.name));
 }

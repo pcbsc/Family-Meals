@@ -1,7 +1,7 @@
 // Week: seven days of meals. Tap a spot to fill it, let the kids choose,
 // fill the week with favorites (no AI), or have Claude plan it.
 import { h, openSheet, toast, confetti, confirmSheet, clearChildren, prettyDate, once } from "../ui.js";
-import { MEALS } from "../seed.js";
+import { MEALS, cuisineOf } from "../seed.js";
 import { dateKey, fromKey, addDays, weekStart, weekDays, fillWithFavorites, isFavorite } from "../planner.js";
 import {
   state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, saveDish, dishList, members, memberById,
@@ -202,6 +202,7 @@ function buildPlanRequest({ slotsToFill, days, note, newIdeas }) {
         id: d.id,
         name: d.name,
         meals: d.meals,
+        cuisine: cuisineOf(d),
         categories: d.categories,
         spicy: d.spicy,
         favorite: isFavorite(d),

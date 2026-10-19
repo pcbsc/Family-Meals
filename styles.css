@@ -798,3 +798,34 @@ details.more > .stack { margin-top: 10px; }
 .cook-video .video { max-width: calc(36vh * 16 / 9); margin: 0 auto; }
 .cook-video .video.tall, .cook-video .video.instagram { height: 42vh; width: auto; max-width: none; }
 .cook-video[hidden] { display: none; }
+
+/* ---------- Kinds of food ---------- */
+
+/* One row of flag buttons that scrolls sideways. */
+.kinds {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; margin: 0 -16px; padding-inline: 16px;
+  scroll-snap-type: x proximity; scrollbar-width: none;
+}
+.kinds::-webkit-scrollbar { display: none; }
+.kind {
+  flex: none; scroll-snap-align: start; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 48px; padding: 6px 14px; border-radius: 999px; border: 3px solid transparent;
+  background: #fff; box-shadow: var(--shadow); font-weight: 800; font-size: 17px; color: var(--ink);
+}
+.kind.on { border-color: var(--ink); background: var(--primary-soft); }
+.kind-emoji { font-size: 24px; line-height: 1; }
+
+/* ---------- What can we make? ---------- */
+
+.fridge-btn { justify-content: flex-start; text-align: left; }
+.have-list { gap: 8px; }
+.have-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 12px; border-radius: 999px;
+  border: 0; background: var(--green-soft); color: var(--ink); font-weight: 800; font-size: 17px;
+}
+.have-x { color: var(--muted); font-size: 14px; margin-left: 2px; }
+.almost-list { display: flex; flex-direction: column; gap: 10px; }
+.almost { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 18px; box-shadow: var(--shadow); padding: 10px; }
+.almost-dish { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 0; color: var(--ink); }
+.list-for .row { gap: 8px; }
+.chip.static { cursor: default; }

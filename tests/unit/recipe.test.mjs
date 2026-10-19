@@ -10,6 +10,8 @@ import {
   parseRecipeText,
   aisleFor,
   findLink,
+  whatCanIMake,
+  keyIngredients,
 } from "../../js/recipe.js";
 
 test("reads quantities, units and notes", () => {
@@ -211,4 +213,27 @@ test("links are found without the punctuation around them", () => {
   assert.equal(findLink("https://en.wikipedia.org/wiki/Kimchi_(food)"), "https://en.wikipedia.org/wiki/Kimchi_(food)");
   assert.equal(findLink("no link here"), "");
   assert.equal(findLink(null), "");
+});
+
+test("what we can make: dishes ready to cook first, then ones that need a thing or two", () => {
+  const eggTomato = { id: "a", name: "Tomato Egg", ingredients: ["5 eggs", "1/2 tsp salt", "3 tomatoes, cut into wedges", "2 tbsp vegetable oil", "1 tbsp ketchup", "1 green onion, sliced"] };
+  const bulgogi = { id: "b", name: "Bulgogi", ingredients: ["1 1/2 lb ribeye, thinly sliced", "1/4 cup soy sauce", "1 onion, sliced", "4 cloves garlic, minced", "Sesame seeds, for serving"] };
+  const katsu = { id: "c", name: "Katsu", ingredients: ["2 chicken breasts", "1 cup panko breadcrumbs", "2 eggs", "2 cups shredded cabbage"] };
+  const salad = { id: "d", name: "Salad", ingredients: ["1 cucumber", "2 tomatoes"] };
+  const result = whatCanIMake([bulgogi, katsu, eggTomato, salad], ["Eggs", "tomatoes", "scallions", "chicken"]);
+  assert.deepEqual(result.map((r) => [r.dish.name, r.missing]), [
+    ["Tomato Egg", []],
+    ["Salad", ["cucumber"]],
+    ["Katsu", ["panko breadcrumbs", "cabbage"]],
+  ], "salt, oil, ketchup and garnishes are assumed; Bulgogi uses nothing we have");
+  assert.deepEqual(whatCanIMake([bulgogi], ["beef", "onion", "garlic"])[0].missing, [], "beef covers ribeye");
+  assert.deepEqual(whatCanIMake([eggTomato], []), []);
+  assert.deepEqual([...keyIngredients(bulgogi)], ["ribeye", "onion", "garlic"]);
+});
+
+test("rice covers rice, but not rice cakes or rice paper", () => {
+  const tteokbokki = { name: "Tteokbokki", ingredients: ["1 lb rice cakes"] };
+  const bowl = { name: "Bowl", ingredients: ["2 cups cooked short-grain rice"] };
+  const result = whatCanIMake([tteokbokki, bowl], ["rice"]);
+  assert.deepEqual(result.map((r) => r.dish.name), ["Bowl"]);
 });

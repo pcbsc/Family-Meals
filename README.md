@@ -10,23 +10,34 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
   **✨ Fill our week** offers two choices: **Use our favorites** fills the empty spots from
   the dishes the family rates highest; **Ask Claude** builds a balanced, healthy week and finds new recipes from
   Seonkyoung Longest and other well-known cooks.
-- **Menu**: all our dishes as picture tiles. Each has servings you can change (the
-  ingredients rescale), steps, tips, food photos, hearts and everyone's faces.
+- **Menu**: all our dishes as picture tiles. Swipe the flag buttons to see one kind of food
+  (🇰🇷 Korean, 🇺🇸 American, 🇮🇹 Italian, 🇲🇽 Mexican, 🇨🇳 Chinese, 🇯🇵 Japanese, 🇮🇳 Indian,
+  🇹🇭 Thai, 🫒 Mediterranean). Each dish has servings you can change (the ingredients
+  rescale), steps, tips, food photos, hearts and everyone's faces.
   **👩‍🍳 Cook together** shows one big step at a time, with timers and read-aloud.
-- **Shop**: the week's ingredients merged into one list, sorted by aisle (including an
-  Asian-market aisle). Tick things off, or send the list to a phone.
+- **🧊 What can we make?** (top of the Menu): tap or type what's in the fridge. It shows the
+  dishes that are ready to cook, and the ones that need just a thing or two, with a button to
+  put those things on the shopping list. Salt, oil, sauces and spices count as already there.
+- **Shop**: one combined list of everything the week's meals need, plus any recipe you add
+  with **🛒 Add to shopping list** on its page. The same ingredient from different dishes is
+  one line, with the total amount and which dishes it's for, sorted by aisle (including an Asian-market
+  aisle), with the cupboard basics folded away. Tick things off, or send the list to a phone.
 - **Add a dish**: paste a link (recipe sites, Instagram, TikTok, YouTube), snap a photo
   of a cookbook page or a screenshot, paste a caption, or write our own.
 - **📺 Videos**: a dish can have a YouTube, TikTok or Instagram video. It plays right on the
   dish page, and in **Cook together** the 📺 button keeps it above the steps while you cook.
 - **🙋 I want to eat…**: kids make wishes, and the grown-ups see them when planning.
 
-It starts with 79 family recipes: 42 healthy Korean home dishes (bulgogi, japchae,
-tteokguk, miyeok guk, gyeran jjim, jjajangmyeon, namul, kimbap…), American family dinners
-(turkey chili, mac & cheese, sheet-pan fajitas, fish sticks, banana oat muffins…), and 7
-dishes that went viral on TikTok and Instagram and that home cooks tested and liked, each
-with the creator's video. If you already use the app, the new recipes appear on their own
-the next time it opens (dishes you deleted stay deleted).
+It starts with 118 family recipes, 105 of them with a cooking video: 42 healthy Korean home
+dishes (bulgogi, japchae, tteokguk, miyeok guk, gyeran jjim, jjajangmyeon, kimbap…),
+American family dinners (turkey chili, mac & cheese, fish sticks, banana oat muffins…),
+Italian (lasagna, meatballs, minestrone, pesto pasta), Mexican (enchiladas, burrito bowls,
+tortilla soup, guacamole), Chinese (egg fried rice, beef & broccoli, potstickers, tomato &
+egg), Japanese (katsu, oyakodon, curry rice, miso soup), Indian (mild butter chicken, dal,
+chana masala), Thai (pad thai, satay, yellow curry) and Mediterranean (souvlaki, falafel,
+shakshuka), plus 7 dishes that went viral on TikTok and Instagram that home cooks tested and
+liked. If you already use the app, new recipes and videos appear on their own the next time
+it opens (dishes you deleted stay deleted, and a video you took off stays off).
 
 ---
 
@@ -93,8 +104,12 @@ Family Menu too.
 
 ## Videos
 
+- **Starter recipes** come with a video: the creator's own TikTok for the trending dishes, and
+  a YouTube video from a well-known cook (Maangchi, Natasha's Kitchen, Made With Lau, Just One
+  Cookbook, Rick Bayless, Hot Thai Kitchen…) for the rest.
 - **Recipes from a video** (a TikTok, Instagram reel or YouTube link) keep that video
-  automatically. Recipes from a website keep the creator's video when the page has one.
+  automatically. Recipes from a website keep the creator's video when the page has one, and
+  if there's no Instagram or TikTok video, Claude looks for a YouTube one.
 - **Any other dish:** open it and tap **📺 Add a video** (at the bottom). Then either
   **✨ Find one for me** (Claude searches YouTube, TikTok and Instagram and picks a good one
   from a well-known cook), or **🔎 Look on YouTube**, tap **Share → Copy link** on the video
@@ -133,8 +148,11 @@ list (Menu → ➕ Add) has three tabs:
   reviews (Good Morning America, The Kitchn, Food52, Time Out, food bloggers), not from
   reading the comments on the posts themselves.
 - **🇰🇷 Korean**: Seonkyoung Longest, Korean Bapsang, Maangchi and My Korean Kitchen.
-- **🇺🇸 American**: Natasha's Kitchen, Once Upon a Chef, Budget Bytes, Sally's Baking
-  Addiction and Super Healthy Kids.
+- **🇺🇸 American**: Natasha's Kitchen, Once Upon a Chef, Sally's Baking Addiction and Super
+  Healthy Kids.
+- **🇮🇹 🇲🇽 🇨🇳 🇯🇵 🇮🇳 🇹🇭 🫒**: Inspired Taste, Rick Bayless, Budget Bytes, Just One Cookbook,
+  RecipeTin Japan, Hebbars Kitchen, Hot Thai Kitchen, Marion's Kitchen and The Mediterranean
+  Dish.
 
 When you tap **Add**, Claude reads that page and saves a copy on your device for your
 family to cook from, with a link back to the creator. Please visit their sites; their
@@ -150,10 +168,10 @@ A static web app with no build step. Open `index.html` through any web server.
 |---|---|
 | `index.html`, `styles.css` | Page shell and all styles |
 | `js/app.js` | Starts the app and routes `#/screens` |
-| `js/views/*.js` | One file per screen |
+| `js/views/*.js` | One file per screen (`fridge.js` is "What can we make?") |
 | `js/store.js` | In-memory data plus saving to IndexedDB |
 | `js/components.js`, `js/ui.js` | Shared pieces: tiles, sheets, PIN pad, photos |
-| `js/recipe.js` | Ingredient parsing, servings scaling, shopping list, timers |
+| `js/recipe.js` | Ingredient parsing, servings scaling, shopping list, timers, what-can-we-make matching |
 | `js/planner.js` | Dates and the no-AI "Use our favorites" |
 | `js/ai.js` | Claude: recipe import, finding videos and week planning |
 | `js/video.js` | Turns YouTube / TikTok / Instagram / Vimeo links into players |

@@ -1,7 +1,7 @@
 // Add: bring in a recipe from a link (websites, Instagram, TikTok, YouTube), a
 // photo or screenshot, pasted text, or write our own. Edit: the recipe form.
 import { h, toast, openSheet, confirmSheet, preparePhoto, pickImage, imageForClaude, clearChildren, once } from "../ui.js";
-import { MEALS, CATEGORIES, SPICE } from "../seed.js";
+import { MEALS, CATEGORIES, CUISINES, SPICE, cuisineOf } from "../seed.js";
 import { parseRecipeText, stripStepNumber, cleanLink, findLink } from "../recipe.js";
 import { isVideoLink } from "../video.js";
 import { state, blankDish, saveDish, updateDish, deleteDish, addPhoto, go, redrawScreen, db } from "../store.js";
@@ -131,7 +131,7 @@ function minutes(n) {
 // heart added while the form was open isn't overwritten.
 const FORM_FIELDS = [
   "name", "nameKo", "emoji", "description", "meals", "categories", "servings", "prepMinutes", "cookMinutes",
-  "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl", "videoUrl",
+  "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl", "videoUrl", "cuisine",
 ];
 
 const DRAFT_BANNERS = {
@@ -200,6 +200,17 @@ export function viewEdit({ match, params }) {
     return row;
   };
 
+  // One kind of food per dish; dishes from before kinds existed start on their best guess.
+  if (!f.cuisine) f.cuisine = cuisineOf(f);
+  const kindRow = h("div.row.wrap");
+  const drawKinds = () => {
+    clearChildren(kindRow);
+    for (const c of CUISINES) {
+      kindRow.append(chip(c.label, { emoji: c.emoji, on: f.cuisine === c.key, onclick: () => { f.cuisine = c.key; touch(); drawKinds(); } }));
+    }
+  };
+  drawKinds();
+
   const spiceRow = h("div.row.wrap");
   const drawSpice = () => {
     clearChildren(spiceRow);
@@ -240,7 +251,10 @@ export function viewEdit({ match, params }) {
     const typedVideo = (f.videoUrl || "").trim();
     f.videoUrl = isVideoLink(typedVideo) ? cleanLink(typedVideo) : "";
     const fields = Object.fromEntries(FORM_FIELDS.map((k) => [k, f[k]]));
-    if (f.videoUrl !== (existing?.videoUrl || "")) fields.videoFound = false;
+    if (f.videoUrl !== (existing?.videoUrl || "")) {
+      fields.videoFound = false;
+      fields.videoRemoved = !f.videoUrl && !!existing?.videoUrl;
+    }
     let saved;
     if (existing) saved = await updateDish(existing.id, fields);
     else {
@@ -281,6 +295,7 @@ export function viewEdit({ match, params }) {
         h("div.stack",
           field("Korean name", text("nameKo", { placeholder: "잡채", lang: "ko" })),
           field("Short description", text("description", { placeholder: "Chewy noodles with lots of veggies" })),
+          h("span.field-label", "Where it's from"), kindRow,
           h("span.field-label", "What kind?"), toggles("categories", CATEGORIES),
           h("span.field-label", "How spicy?"), spiceRow,
           h("div.row.wrap.form-numbers",

@@ -1,8 +1,8 @@
 // The app's data in memory, plus the functions that change it. Every change is
 // written to IndexedDB straight away, then the current screen redraws.
 import * as db from "./db.js";
-import { MEALS, STARTER_DISHES, LATEST_STARTER_BATCH, startersToAdd } from "./seed.js";
-import { dateKey, addDays, slotId, averageRating } from "./planner.js";
+import { MEALS, STARTER_DISHES, LATEST_STARTER_BATCH, startersToAdd, starterVideoFills } from "./seed.js";
+import { dateKey, addDays, slotId, averageRating, weekStart } from "./planner.js";
 
 export const DEFAULT_SETTINGS = {
   onboarded: false,
@@ -144,15 +144,18 @@ export async function addStarterDishes(list = STARTER_DISHES) {
 
 /**
  * When the app gains new starter recipes, a family using the starter menu gets
- * them once. Returns how many were added. Starters they deleted stay deleted.
+ * them once, and their starter dishes get any new videos. Starters they deleted
+ * stay deleted, and a video they took off stays off. Returns { added, videos }.
  */
 export async function addNewStarters() {
   const s = state.settings;
-  if (!s.onboarded || (s.starterBatch ?? 0) >= LATEST_STARTER_BATCH) return 0;
+  if (!s.onboarded || (s.starterBatch ?? 0) >= LATEST_STARTER_BATCH) return { added: 0, videos: 0 };
   const haveSeedKeys = new Set(dishList().map((d) => d.seedKey).filter(Boolean));
   const added = await addStarterDishes(startersToAdd({ starterBatch: s.starterBatch, haveSeedKeys }));
+  const fills = starterVideoFills(dishList());
+  for (const { id, videoUrl } of fills) await updateDish(id, { videoUrl });
   await saveSettings({ starterBatch: LATEST_STARTER_BATCH });
-  return added;
+  return { added, videos: fills.length };
 }
 
 export function rating(dish) {
@@ -274,6 +277,27 @@ export function wishLabel(wish) {
 
 export function shoppingFor(weekKey) {
   return state.shopping.get(weekKey) || { id: weekKey, checked: {}, extras: [] };
+}
+
+/** This week's shopping list (the one the Shop tab opens on). */
+export function thisWeeksShopping() {
+  return shoppingFor(dateKey(weekStart(new Date(), state.settings.weekStartsOn)));
+}
+
+/** Puts a dish's ingredients (for this many people) on this week's list. */
+export async function addRecipeToShopping(dishId, servings) {
+  const shop = thisWeeksShopping();
+  const recipes = (shop.recipes || []).filter((r) => r.dishId !== dishId);
+  await saveShopping({ ...shop, recipes: [...recipes, { dishId, servings }] });
+}
+
+/** Adds things (like what a dish is missing) to this week's list, skipping ones already there. */
+export async function addShoppingExtras(texts) {
+  const shop = thisWeeksShopping();
+  const have = new Set(shop.extras.map((e) => e.text.toLowerCase()));
+  const fresh = texts.filter((t) => t && !have.has(t.toLowerCase())).map((text) => ({ id: db.newId("x-"), text, checked: false }));
+  await saveShopping({ ...shop, extras: [...shop.extras, ...fresh] });
+  return fresh.length;
 }
 
 export async function saveShopping(entry) {
