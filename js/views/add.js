@@ -1,9 +1,9 @@
 // Add: bring in a recipe from a link (websites, Instagram, TikTok, YouTube), a
 // photo or screenshot, pasted text, or write our own. Edit: the recipe form.
-import { h, toast, openSheet, preparePhoto, pickImage, imageForClaude, clearChildren, once } from "../ui.js";
+import { h, toast, openSheet, confirmSheet, preparePhoto, pickImage, imageForClaude, clearChildren, once } from "../ui.js";
 import { MEALS, CATEGORIES, SPICE } from "../seed.js";
 import { parseRecipeText, stripStepNumber, cleanLink } from "../recipe.js";
-import { state, blankDish, saveDish, updateDish, addPhoto, go, redrawScreen, db } from "../store.js";
+import { state, blankDish, saveDish, updateDish, deleteDish, addPhoto, go, redrawScreen, db } from "../store.js";
 import { backHeader, stepper, chip, progressSheet, needKeySheet, dishArt } from "../components.js";
 
 const URL_RE = /https?:\/\/[^\s"'<>]+/i;
@@ -55,11 +55,11 @@ export async function runImport({ url = "", text = "", imageFile = null }) {
 
 export async function viewAdd({ params }) {
   const hasKey = !!state.settings.apiKey;
-  let link = "";
   let pasted = "";
-  const pasteBox = h("textarea.text", {
-    rows: 6,
-    placeholder: "Paste a recipe or an Instagram/TikTok caption here",
+  const box = h("textarea.text", {
+    rows: 3,
+    placeholder: "Paste a link (Instagram, TikTok, a website) or the recipe",
+    "aria-label": "Link or recipe",
     oninput: (e) => (pasted = e.target.value),
   });
 
@@ -73,63 +73,39 @@ export async function viewAdd({ params }) {
         setTimeout(() => runImport({ url: found, text: caption.length > 30 ? caption : "", imageFile: shared.image }), 50);
       } else {
         pasted = all;
-        pasteBox.value = all;
+        box.value = all;
       }
     }
   }
 
-  const useText = () => {
-    if (!pasted.trim()) return toast("Paste something first.", { emoji: "📋" });
-    const inText = pasted.match(URL_RE)?.[0] || "";
-    if (hasKey) return runImport({ text: pasted, url: inText });
-    const r = parseRecipeText(pasted);
-    state.draft = { ...blankDish(), ...r, servings: r.servings || state.settings.servings, sourceUrl: inText };
+  // One box for both: a link goes to Claude to read; recipe text is tidied by Claude, or
+  // (without a Claude key) sorted into ingredients and steps right here.
+  const go_ = () => {
+    const text = pasted.trim();
+    if (!text) return toast("Paste a link or a recipe first.", { emoji: "📋" });
+    const url = text.match(URL_RE)?.[0] || "";
+    const rest = text.replace(url, "").trim();
+    if (hasKey) return runImport({ url, text: url && rest.length <= 30 ? "" : text });
+    if (url && rest.length <= 30) return needKeySheet("Reading links");
+    const r = parseRecipeText(text);
+    state.draft = { ...blankDish(), ...r, servings: r.servings || state.settings.servings, sourceUrl: url };
     go("#/new?draft=1");
   };
 
   return h("div.screen.add",
     backHeader("➕ Add a dish", { back: "#/menu" }),
-    !hasKey
-      ? h("section.card.banner",
-        h("span.banner-emoji", "✨"),
-        h("div.grow", h("strong", "Want Claude to do the typing?"), h("p.muted", "A grown-up can add a Claude key in Settings. Then links, Instagram, TikTok and photos turn into recipes by themselves.")),
-      )
-      : null,
     h("section.card.add-card",
-      h("h2", "🔗 From a link"),
-      h("p.muted", "A recipe website, Instagram, TikTok or YouTube."),
-      h("input.text", {
-        type: "url",
-        inputmode: "url",
-        placeholder: "https://…",
-        oninput: (e) => (link = e.target.value.trim()),
-      }),
-      h("button.btn.primary.wide", {
-        onclick: () => {
-          const url = link.match(URL_RE)?.[0];
-          if (!url) return toast("That doesn't look like a link.", { emoji: "🔗" });
-          runImport({ url });
-        },
-      }, "✨ Get the recipe"),
-      h("p.tip", "📲 Even easier: in Instagram or TikTok tap ", h("strong", "Share"), " then ", h("strong", "Family Menu"), "."),
+      box,
+      h("button.btn.primary.big.wide", { onclick: go_ }, hasKey ? "✨ Get the recipe" : "➡️ Next"),
+      h("p.tip", "📲 Or in Instagram or TikTok, tap ", h("strong", "Share"), " → ", h("strong", "Family Menu"), "."),
     ),
-    h("section.card.add-card",
-      h("h2", "📸 From a photo"),
-      h("p.muted", "A cookbook page, a recipe card, or a screenshot of a video's recipe."),
-      h("div.row",
-        h("button.btn.soft.grow", { onclick: async () => { const f = await pickImage({ camera: true }); if (f) runImport({ imageFile: f }); } }, "📷 Take a photo"),
-        h("button.btn.soft.grow", { onclick: async () => { const f = await pickImage(); if (f) runImport({ imageFile: f }); } }, "🖼️ Pick a screenshot"),
-      ),
-    ),
-    h("section.card.add-card",
-      h("h2", "📋 Paste it"),
-      pasteBox,
-      h("button.btn.primary.wide", { onclick: useText }, hasKey ? "✨ Tidy it up" : "➡️ Use this text"),
-    ),
-    h("button.card.add-card.write-own", { onclick: () => { state.draft = null; go("#/new"); } },
-      h("span.banner-emoji", "✍️"),
-      h("span.grow", h("strong", "Write our own recipe"), h("span.muted.block", "Grandma's secret, Dad's special, or something we made up!")),
-      h("span.chev", "▶"),
+    h("div.add-choices",
+      h("button.add-choice", { onclick: async () => { const f = await pickImage(); if (f) runImport({ imageFile: f }); } },
+        h("span.add-emoji", "📸"), "Photo of a recipe"),
+      h("button.add-choice", { onclick: () => { state.draft = null; go("#/new"); } },
+        h("span.add-emoji", "✍️"), "Write our own recipe"),
+      h("button.add-choice", { onclick: () => go("#/discover") },
+        h("span.add-emoji", "✨"), "Ideas from famous cooks"),
     ),
   );
 }
@@ -218,10 +194,11 @@ export function viewEdit({ match, params }) {
   };
   drawSpice();
 
-  const addPhotoBtn = (camera) => h("button.btn.soft", {
+  // One button: Android offers "Camera" or the gallery.
+  const addPhotoBtn = () => h("button.btn.soft", {
     type: "button",
     onclick: async () => {
-      const file = await pickImage({ camera });
+      const file = await pickImage();
       if (!file) return;
       const photo = await preparePhoto(file);
       if (existing) {
@@ -233,7 +210,7 @@ export function viewEdit({ match, params }) {
         pendingWrap.append(h("img.pending-photo", { src: URL.createObjectURL(photo.thumb), alt: "New photo" }));
       }
     },
-  }, camera ? "📷 Take photo" : "🖼️ Choose photo");
+  }, "📷 Add photo");
 
   const save = once(async () => {
     f.name = (f.name || "").trim();
@@ -283,24 +260,39 @@ export function viewEdit({ match, params }) {
         emojiBtn,
         h("div.grow", field("Name", text("name", { placeholder: "Grandma's Japchae", autofocus: !existing && !draft }))),
       ),
-      h("div.row.wrap", addPhotoBtn(true), addPhotoBtn(false)),
-      pendingWrap,
-      field("Korean name (optional)", text("nameKo", { placeholder: "잡채", lang: "ko" })),
-      field("Short description (optional)", text("description", { placeholder: "Chewy noodles with lots of veggies" })),
+      h("div.row.wrap", addPhotoBtn(), pendingWrap),
       h("span.field-label", "Good for"), toggles("meals", MEALS),
-      h("span.field-label", "What kind?"), toggles("categories", CATEGORIES),
-      h("span.field-label", "How spicy?"), spiceRow,
-      h("div.row.wrap.form-numbers",
-        h("div.field", h("span.field-label", "Makes (people)"), stepper(f.servings || 4, { onchange: (n) => { f.servings = n; touch(); }, max: 40, label: "Servings" })),
-        h("label.field.small-field", h("span.field-label", "Prep min"), text("prepMinutes", { type: "number", inputmode: "numeric", min: 0, oninput: (e) => { f.prepMinutes = minutes(e.target.value); touch(); } })),
-        h("label.field.small-field", h("span.field-label", "Cook min"), text("cookMinutes", { type: "number", inputmode: "numeric", min: 0, oninput: (e) => { f.cookMinutes = minutes(e.target.value); touch(); } })),
+      h("div.field", h("span.field-label", "Makes (people)"), stepper(f.servings || 4, { onchange: (n) => { f.servings = n; touch(); }, max: 40, label: "Servings" })),
+      field("Ingredients", area("ingredients", 8, { placeholder: "2 cups rice\n1 lb beef, sliced\n3 tbsp soy sauce" }), "One per line, amount first."),
+      field("Steps", area("steps", 8, { placeholder: "Wash the rice.\nCook the beef for 5 minutes." }), "One step per line."),
+      h("details.more",
+        h("summary", "More details (optional)"),
+        h("div.stack",
+          field("Korean name", text("nameKo", { placeholder: "잡채", lang: "ko" })),
+          field("Short description", text("description", { placeholder: "Chewy noodles with lots of veggies" })),
+          h("span.field-label", "What kind?"), toggles("categories", CATEGORIES),
+          h("span.field-label", "How spicy?"), spiceRow,
+          h("div.row.wrap.form-numbers",
+            h("label.field.small-field", h("span.field-label", "Prep min"), text("prepMinutes", { type: "number", inputmode: "numeric", min: 0, oninput: (e) => { f.prepMinutes = minutes(e.target.value); touch(); } })),
+            h("label.field.small-field", h("span.field-label", "Cook min"), text("cookMinutes", { type: "number", inputmode: "numeric", min: 0, oninput: (e) => { f.cookMinutes = minutes(e.target.value); touch(); } })),
+          ),
+          field("Tips", area("notes", 3, { placeholder: "Kids like it with extra sesame seeds." })),
+          field("Recipe from", text("sourceName", { placeholder: "Seonkyoung Longest, Grandma…" })),
+          field("Link", text("sourceUrl", { type: "url", placeholder: "https://…" })),
+        ),
       ),
-      field("Ingredients", area("ingredients", 9, { placeholder: "2 cups rice\n1 lb beef, sliced\n3 tbsp soy sauce" }), "One per line, amount first. Lines ending in ':' become headings, like 'For the sauce:'."),
-      field("Steps", area("steps", 9, { placeholder: "Wash the rice.\nCook the beef for 5 minutes." }), "One step per line. Say times like '10 minutes' and Cook-along makes a timer!"),
-      field("Tips (optional)", area("notes", 3, { placeholder: "Kids like it with extra sesame seeds." })),
-      field("Recipe from (optional)", text("sourceName", { placeholder: "Seonkyoung Longest, Grandma…" })),
-      field("Link (optional)", text("sourceUrl", { type: "url", placeholder: "https://…" })),
     ),
     h("div.save-bar", h("button.btn.primary.big.wide", { onclick: save }, "💾 Save")),
+    existing
+      ? h("button.btn.ghost.danger-text.center-btn", {
+        onclick: async () => {
+          if (!(await confirmSheet(`Delete ${existing.name} from our menu? Its photos go too.`, { yes: "Delete", danger: true }))) return;
+          await deleteDish(existing.id);
+          unsaved.delete(formKey);
+          toast(`${existing.name} was deleted.`, { emoji: "🗑️" });
+          go("#/menu", { replace: true });
+        },
+      }, "🗑️ Delete this dish")
+      : null,
   );
 }

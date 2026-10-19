@@ -4,22 +4,22 @@ import {
   h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
   minutesText, clearChildren,
 } from "../ui.js";
-import { MEALS, SPICE } from "../seed.js";
+import { SPICE } from "../seed.js";
 import { scaleIngredient, parseIngredient, findTimers, cleanLink } from "../recipe.js";
 import { dateKey } from "../planner.js";
 import {
-  state, updateDish, deleteDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh,
+  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh,
 } from "../store.js";
 import {
-  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, wishFlow, planItSheet, categoryLabel,
+  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet,
 } from "../components.js";
 
 function notFound() {
   return h("div.screen", backHeader("Oops", { back: "#/menu" }), h("div.empty-state", h("div.huge-emoji", "🤷"), h("p", "That dish isn't in our menu anymore.")));
 }
 
-async function addPhotoFlow(dish, camera) {
-  const file = await pickImage({ camera });
+async function addPhotoFlow(dish) {
+  const file = await pickImage();
   if (!file) return;
   try {
     await addPhoto(dish.id, await preparePhoto(file));
@@ -55,9 +55,9 @@ function photoStrip(dish) {
     strip.append(track);
     if (ids.length > 1) strip.append(h("span.hero-count", `${ids.length} photos ▸`));
   }
+  // One button: Android offers "Camera" or the gallery.
   strip.append(h("div.hero-buttons",
-    h("button.btn.photo-btn", { onclick: () => addPhotoFlow(dish, true) }, "📷 Take photo"),
-    h("button.btn.photo-btn", { onclick: () => addPhotoFlow(dish, false) }, "🖼️"),
+    h("button.btn.photo-btn", { onclick: () => addPhotoFlow(dish) }, "📷 Add photo"),
   ));
   return strip;
 }
@@ -95,10 +95,9 @@ export function viewDish({ match }) {
   };
   drawIngredients();
   const total = (dish.prepMinutes || 0) + (dish.cookMinutes || 0);
-  const meals = MEALS.filter((m) => dish.meals?.includes(m.key));
 
   return h("div.screen.dish",
-    backHeader(dish.name, {
+    backHeader(null, {
       back: "#/menu",
       right: h("button.icon-btn", {
         "aria-label": "Edit dish",
@@ -114,8 +113,6 @@ export function viewDish({ match }) {
     h("div.facts",
       total ? h("span.fact", "⏱️ ", minutesText(total)) : null,
       h("span.fact", dish.spicy ? "🌶️".repeat(dish.spicy) + " " : "😊 ", SPICE[dish.spicy || 0]),
-      ...meals.map((m) => h("span.fact", m.emoji, " ", m.label)),
-      ...(dish.categories || []).filter((c) => c !== "korean").slice(0, 3).map((c) => h("span.fact", categoryLabel(c))),
     ),
     h("div.dish-actions",
       h(`button.action${dish.favorite ? ".on" : ""}`, {
@@ -127,7 +124,6 @@ export function viewDish({ match }) {
         },
       }, h("span.action-emoji", dish.favorite ? "❤️" : "🤍"), "Favorite"),
       h("button.action", { onclick: () => rateSheet(dish) }, h("span.action-emoji", "⭐"), "Rate"),
-      h("button.action", { onclick: () => wishFlow(dish.id) }, h("span.action-emoji", "🙋"), "I want it"),
       h("button.action", { onclick: () => planItSheet(dish) }, h("span.action-emoji", "📅"), "Plan it"),
     ),
     familyFaces(dish),
@@ -152,15 +148,6 @@ export function viewDish({ match }) {
     dish.notes ? h("section.card.notes", h("h2", "💡 Tips"), h("p", dish.notes)) : null,
     sourceLine(dish),
     dish.timesCooked ? h("p.muted.center", `We've cooked this ${dish.timesCooked} time${dish.timesCooked === 1 ? "" : "s"}! 🎉`) : null,
-    h("button.btn.ghost.danger-text.center-btn", {
-      onclick: async () => {
-        if (!(await grownUp())) return;
-        if (!(await confirmSheet(`Delete ${dish.name} from our menu? Its photos go too.`, { yes: "Delete", danger: true }))) return;
-        await deleteDish(dish.id);
-        toast(`${dish.name} was deleted.`, { emoji: "🗑️" });
-        go("#/menu", { replace: true });
-      },
-    }, "🗑️ Delete this dish"),
   );
 }
 

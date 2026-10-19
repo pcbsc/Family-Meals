@@ -4,52 +4,58 @@ import { h, clearChildren, toast } from "../ui.js";
 import { MEALS, CATEGORIES, DISCOVER } from "../seed.js";
 import { isFavorite } from "../planner.js";
 import { state, dishList, rating, go } from "../store.js";
-import { dishTile, chip, backHeader, needKeySheet } from "../components.js";
+import { dishTile, backHeader, needKeySheet } from "../components.js";
 import { runImport } from "./add.js";
 
 let lastFilter = "all";
 let lastQuery = "";
 
+const FILTERS = [
+  { key: "all", emoji: "⭐", label: "All" },
+  { key: "fav", emoji: "❤️", label: "Favorites" },
+  ...MEALS.map((m) => ({ key: m.key, emoji: m.emoji, label: m.key === "snack" ? "Snacks" : m.label })),
+];
+
+// Words a dish can be found by: its names, ingredients and kinds ("Korean", "Soups"…).
+function searchText(d) {
+  const kinds = (d.categories || []).map((c) => CATEGORIES.find((x) => x.key === c)?.label || c);
+  return [d.name, d.nameKo, d.description, ...kinds, ...(d.ingredients || [])].join(" ").toLowerCase();
+}
+
 export function viewMenu({ params }) {
-  let filter = params.get("c") || lastFilter;
+  let filter = FILTERS.some((f) => f.key === params.get("c")) ? params.get("c") : lastFilter;
   let query = lastQuery;
   const grid = h("div.tile-grid");
-  const chips = h("div.chips.scroll");
-  const count = h("p.muted.count");
+  const filters = h("div.filters");
 
   const matches = (d) => {
     if (filter === "fav") return isFavorite(d);
-    if (MEALS.some((m) => m.key === filter)) return (d.meals || []).includes(filter);
-    if (CATEGORIES.some((c) => c.key === filter)) return (d.categories || []).includes(filter);
+    if (filter !== "all") return (d.meals || []).includes(filter);
     return true;
   };
   const draw = () => {
     lastFilter = filter;
     lastQuery = query;
-    clearChildren(chips);
-    const options = [
-      ["all", "⭐", "Everything"],
-      ["fav", "❤️", "Favorites"],
-      ...MEALS.map((m) => [m.key, m.emoji, m.label]),
-      ...CATEGORIES.map((c) => [c.key, c.emoji, c.label]),
-    ];
-    for (const [key, emoji, label] of options) {
-      chips.append(chip(label, { emoji, on: filter === key, onclick: () => { filter = key; draw(); } }));
+    clearChildren(filters);
+    for (const f of FILTERS) {
+      filters.append(h(`button.filter${filter === f.key ? ".on" : ""}`, {
+        "aria-pressed": filter === f.key ? "true" : "false",
+        onclick: () => { filter = f.key; draw(); },
+      }, h("span.filter-emoji", f.emoji), f.label));
     }
     clearChildren(grid);
     const q = query.trim().toLowerCase();
     const list = dishList()
       .filter(matches)
-      .filter((d) => !q || [d.name, d.nameKo, d.description, ...(d.ingredients || [])].join(" ").toLowerCase().includes(q))
+      .filter((d) => !q || searchText(d).includes(q))
       .sort((a, b) =>
         Number(isFavorite(b)) - Number(isFavorite(a)) ||
         (rating(b) ?? 2.5) - (rating(a) ?? 2.5) ||
         a.name.localeCompare(b.name));
-    count.textContent = `${list.length} dish${list.length === 1 ? "" : "es"}`;
     if (!list.length) {
       grid.append(h("div.empty-state",
         h("div.huge-emoji", "🍽️"),
-        h("p", state.dishes.size ? "No dishes match." : "Our menu is empty. Let's add a dish!"),
+        h("p", state.dishes.size ? "No dishes here." : "Our menu is empty. Let's add a dish!"),
       ));
     }
     for (const d of list) grid.append(dishTile(d, { onclick: () => go(`#/dish/${d.id}`) }));
@@ -58,23 +64,17 @@ export function viewMenu({ params }) {
 
   return h("div.screen.menu",
     h("header.top",
-      h("h1", "📖 Our menu"),
+      h("h1", "📖 Menu"),
       h("button.btn.primary", { onclick: () => go("#/add") }, "➕ Add"),
     ),
+    filters,
     h("input.search", {
       type: "search",
       value: query,
-      placeholder: "🔍 Find a dish or ingredient",
+      placeholder: "🔍 Search",
       "aria-label": "Search the menu",
       oninput: (e) => { query = e.target.value; draw(); },
     }),
-    chips,
-    h("button.card.discover-card", { onclick: () => go("#/discover") },
-      h("span.banner-emoji", "✨"),
-      h("span.grow", h("strong", "Find new recipes"), h("span.muted.block", "Seonkyoung Longest, Korean Bapsang, Maangchi")),
-      h("span.chev", "▶"),
-    ),
-    count,
     grid,
   );
 }
@@ -88,7 +88,7 @@ export function viewDiscover() {
     groups.get(r.by).push(r);
   }
   return h("div.screen.discover",
-    backHeader("✨ Discover", { back: "#/menu" }),
+    backHeader("✨ Ideas from famous cooks", { back: "#/add" }),
     h("p.muted", "Famous home cooks with healthy family Korean food. Tap Add and Claude reads the recipe and puts it in our menu. You can also ask Claude to find new dishes when it plans your week."),
     ...[...groups.entries()].map(([by, recipes]) =>
       h("section.discover-group",

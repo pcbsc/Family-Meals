@@ -1,7 +1,7 @@
 // Pieces used on several screens: dish pictures and tiles, the dish picker,
 // rating faces, the "I want…" wish flow, plan-it, and the Claude progress view.
 import { h, openSheet, toast, confetti, colorFor, clearChildren, prettyDate, grownUpCheck, once } from "./ui.js";
-import { MEALS, CATEGORIES, FACES } from "./seed.js";
+import { MEALS, FACES } from "./seed.js";
 import { dateKey, addDays, isFavorite } from "./planner.js";
 import {
   state, members, memberById, enabledMeals, dishList, rating, rateDish, photoUrl, getSlot,
@@ -59,7 +59,7 @@ export function backHeader(title, { back = "#/today", right = null } = {}) {
       // Go back if we came from inside the app; otherwise (opened from a shortcut) go somewhere sensible.
       onclick: () => (state.navCount > 1 ? history.back() : go(back)),
     }, "◀"),
-    h("h1.sub-title", title),
+    title ? h("h1.sub-title", title) : h("span.grow"),
     right || h("span.spacer-36"),
   );
 }
@@ -329,11 +329,6 @@ export function progressSheet(title) {
       return sheet.close();
     },
   };
-}
-
-export function categoryLabel(key) {
-  const c = CATEGORIES.find((x) => x.key === key);
-  return c ? `${c.emoji} ${c.label}` : key;
 }
 
 export function needKeySheet(what) {

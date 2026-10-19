@@ -272,7 +272,7 @@ export function viewWelcome() {
     const korean = STARTER_DISHES.filter((d) => d.categories.includes("korean")).length;
     const finish = async (withStarters) => {
       const people = state.settings.members.length;
-      await saveSettings({ onboarded: true, servings: people >= 2 ? people : state.settings.servings });
+      await saveSettings({ onboarded: true, onboardedAt: Date.now(), servings: people >= 2 ? people : state.settings.servings });
       if (withStarters) await addStarterDishes();
       confetti();
       go("#/today", { replace: true });

@@ -10,7 +10,8 @@ export function viewShop({ params }) {
   const start = params.get("w") ? fromKey(params.get("w")) : weekStart(new Date(), state.settings.weekStartsOn);
   const weekKey = dateKey(start);
   const today = dateKey(new Date());
-  let onlyAhead = weekKey <= today && today <= dateKey(addDays(start, 6));
+  // This week's list covers today onward; another week's covers all of it.
+  const onlyAhead = weekKey <= today && today <= dateKey(addDays(start, 6));
   const body = h("div.stack");
 
   const entries = () => {
@@ -49,21 +50,12 @@ export function viewShop({ params }) {
       );
     };
 
-    if (weekKey <= today && today <= dateKey(addDays(start, 6))) {
-      body.append(h("div.row.wrap",
-        h(`button.chip${onlyAhead ? ".on" : ""}`, { onclick: () => { onlyAhead = true; draw(); } }, "From today on"),
-        h(`button.chip${!onlyAhead ? ".on" : ""}`, { onclick: () => { onlyAhead = false; draw(); } }, "Whole week"),
-      ));
-    }
-
     if (!planned.length && !shop.extras.length) {
       body.append(h("div.empty-state",
         h("div.huge-emoji", "🪄"),
         h("p", "Plan some meals and the list makes itself!"),
         h("button.btn.primary", { onclick: () => go(`#/week?w=${weekKey}`) }, "📅 Plan the week"),
       ));
-    } else {
-      body.append(h("p.muted", `For ${planned.length} dish${planned.length === 1 ? "" : "es"} on the plan.`));
     }
 
     for (const aisle of AISLES) {

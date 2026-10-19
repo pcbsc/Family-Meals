@@ -479,7 +479,7 @@ textarea.text { line-height: 1.5; resize: vertical; }
 .facts { display: flex; flex-wrap: wrap; gap: 8px; }
 .fact { background: #fff; border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 16px; box-shadow: var(--shadow); }
 
-.dish-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.dish-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .action {
   display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px;
   border: 0; border-radius: 20px; background: #fff; box-shadow: var(--shadow); font-weight: 800; font-size: 15px;
@@ -716,3 +716,51 @@ body:has(.sheet) .toast { bottom: auto; top: calc(16px + env(safe-area-inset-top
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Simple layout pieces ---------- */
+
+/* Today: the day's other meals as small rows under the big card. */
+.meal-rows { display: flex; flex-direction: column; gap: 10px; }
+.meal-row {
+  display: flex; align-items: center; gap: 14px; min-height: 76px; padding: 10px 14px 10px 10px;
+  border: 0; border-radius: 22px; background: var(--meal, #fff); text-align: left; box-shadow: var(--shadow);
+}
+.meal-row-emoji { width: 64px; height: 64px; flex: none; display: grid; place-items: center; font-size: 34px; border-radius: 16px; background: rgba(255,255,255,.6); }
+.meal-row-text { display: flex; flex-direction: column; min-width: 0; }
+.meal-row .meal-label { padding: 0; font-size: 14px; }
+.meal-row .meal-name { padding: 0; font-size: 21px; }
+.meal-row .meal-empty { padding: 0; font-size: 19px; }
+
+/* Menu: six big picture filters. */
+.filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.filter {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px;
+  border: 3px solid transparent; border-radius: 20px; background: #fff; box-shadow: var(--shadow);
+  font-weight: 900; font-size: 16px;
+}
+.filter.on { border-color: var(--ink); background: var(--primary-soft); }
+.filter-emoji { font-size: 30px; line-height: 1.1; }
+@media (min-width: 640px) { .filters { grid-template-columns: repeat(6, 1fr); } }
+
+/* Add: three big choices. */
+.add-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.add-choice {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 130px; padding: 14px; border: 0; border-radius: var(--radius); background: #fff;
+  box-shadow: var(--shadow); font-weight: 900; font-size: 18px; text-align: center;
+}
+.add-emoji { font-size: 44px; line-height: 1; }
+
+/* Week: the two ways to fill it. */
+.choice-btn {
+  display: flex; align-items: center; gap: 14px; padding: 16px; border: 0; border-radius: var(--radius);
+  background: #fff; box-shadow: var(--shadow); text-align: left; font-size: 19px;
+}
+
+/* Edit form: the optional fields stay folded away. */
+details.more { border-top: 2px solid var(--line); padding-top: 12px; }
+details.more > summary { cursor: pointer; font-weight: 900; color: var(--primary-dark); list-style: none; min-height: 44px; display: flex; align-items: center; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "▸ "; }
+details.more[open] > summary::before { content: "▾ "; }
+details.more > .stack { margin-top: 10px; }

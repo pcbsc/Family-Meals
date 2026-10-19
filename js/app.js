@@ -1,7 +1,7 @@
 // Family Menu: starts the app, picks the screen for the address bar's #/route,
 // and keeps the tab bar in step.
 import { h, clearChildren, toast } from "./ui.js";
-import { state, loadAll, setRedraw, go } from "./store.js";
+import { state, loadAll, setRedraw, saveSettings, go } from "./store.js";
 import { askToKeepData } from "./db.js";
 import { viewToday } from "./views/today.js";
 import { viewWeek } from "./views/week.js";
@@ -95,6 +95,7 @@ async function start() {
     return;
   }
   askToKeepData();
+  if (state.settings.onboarded && !state.settings.onboardedAt) saveSettings({ onboardedAt: Date.now() });
   // Anything that fails to save gets said out loud instead of silently lost.
   window.addEventListener("unhandledrejection", (e) => {
     console.error(e.reason);

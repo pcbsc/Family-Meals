@@ -7,8 +7,8 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
 - **Today**: what's for breakfast, lunch, dinner and snack. When a grown-up sets out
   2–3 choices, the kids pick tonight's dinner. Rate last night's dinner with faces 😍 😋 😐 😖.
 - **Week**: plan seven days. Tap a spot to pick a dish, add sides, or let the kids choose.
-  **🎲 Fill with favorites** fills the empty spots from the dishes the family rates highest.
-  **✨ Plan with Claude** builds a balanced, healthy week and finds new recipes from
+  **✨ Fill our week** offers two choices: **Use our favorites** fills the empty spots from
+  the dishes the family rates highest; **Ask Claude** builds a balanced, healthy week and finds new recipes from
   Seonkyoung Longest and other well-known cooks.
 - **Menu**: all our dishes as picture tiles. Each has servings you can change (the
   ingredients rescale), steps, tips, food photos, hearts and everyone's faces.
@@ -61,7 +61,7 @@ cards, and plans the week. It needs a key from an Anthropic account:
    **✨ Claude** → **Save & test**.
 
 **Cost:** about 10–15¢ to import a recipe, and 25–40¢ to plan a week that includes new
-dishes from the web. "Fill with favorites" and everything else are free and work offline.
+dishes from the web. "Use our favorites" and everything else are free and work offline.
 
 The key is saved only on this device. It isn't put in backup files, and it's only ever
 sent to Claude.
@@ -101,8 +101,8 @@ monthly.
 
 ## About the recipes
 
-The starter recipes are home-style versions written for this app. The **✨ Discover**
-list (Menu tab) links to recipes by Seonkyoung Longest, Korean Bapsang and Maangchi.
+The starter recipes are home-style versions written for this app. The **✨ Ideas from famous cooks**
+list (Menu → ➕ Add) links to recipes by Seonkyoung Longest, Korean Bapsang and Maangchi.
 When you tap **Add**, Claude reads that page and saves a copy on your device for your
 family to cook from, with a link back to the creator. Please visit their sites; their
 videos are wonderful to watch together.
@@ -121,9 +121,9 @@ A static web app with no build step. Open `index.html` through any web server.
 | `js/store.js` | In-memory data plus saving to IndexedDB |
 | `js/components.js`, `js/ui.js` | Shared pieces: tiles, sheets, PIN pad, photos |
 | `js/recipe.js` | Ingredient parsing, servings scaling, shopping list, timers |
-| `js/planner.js` | Dates and the no-AI "Fill with favorites" |
+| `js/planner.js` | Dates and the no-AI "Use our favorites" |
 | `js/ai.js` | Claude: recipe import and week planning |
-| `js/seed.js` | Starter recipes and the Discover list |
+| `js/seed.js` | Starter recipes and the "Ideas from famous cooks" list |
 | `sw.js`, `manifest.webmanifest` | Offline support and the Android share target |
 | `vendor/` | The official Anthropic SDK bundled as one module |
 

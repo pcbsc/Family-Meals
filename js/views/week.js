@@ -20,6 +20,8 @@ function rangeText(start) {
   return `${prettyDate(start, opts)} – ${prettyDate(end, opts)}`;
 }
 
+const showPast = {};
+
 // ---------- One meal spot ----------
 
 function slotSheet(dayKey, meal) {
@@ -209,6 +211,20 @@ function buildPlanRequest({ slotsToFill, days, note, newIdeas }) {
       };
     }),
   };
+}
+
+/** The one "fill the week" button: favorites (instant, free) or Claude. */
+function fillSheet(days) {
+  openSheet((close) =>
+    h("div.button-list",
+      h("button.choice-btn", { onclick: async () => { await close(); fillFavorites(days); } },
+        h("span.add-emoji", "🎲"),
+        h("span.grow", h("strong", "Use our favorites"), h("span.muted.block", "Fills the empty spots right away. Free."))),
+      h("button.choice-btn", { onclick: async () => { await close(); planSheet(days); } },
+        h("span.add-emoji", "✨"),
+        h("span.grow", h("strong", "Ask Claude"), h("span.muted.block", "A healthy, balanced week, plus new recipes to try."))),
+    ),
+  { title: "Fill our week" });
 }
 
 function planSheet(days) {
@@ -428,6 +444,7 @@ export function viewWeek({ params }) {
   const days = weekDays(start);
   const today = dateKey(new Date());
   const isThisWeek = dateKey(weekStart(new Date(), state.settings.weekStartsOn)) === dateKey(start);
+  const pastDays = isThisWeek ? days.filter((d) => dateKey(d) < today).length : 0;
   const meals = enabledMeals();
   return h("div.screen.week",
     h("header.top",
@@ -440,13 +457,14 @@ export function viewWeek({ params }) {
       h("button.icon-btn", { "aria-label": "Next week", onclick: () => go(`#/week?w=${dateKey(addDays(start, 7))}`, { replace: true }) }, "▶"),
     ),
     !isThisWeek ? h("button.btn.ghost.center-btn", { onclick: () => go("#/week", { replace: true }) }, "Back to this week") : null,
-    h("div.row.wrap.actions",
-      h("button.btn.primary", { onclick: () => planSheet(days) }, "✨ Plan with Claude"),
-      h("button.btn.soft", { onclick: () => fillFavorites(days) }, "🎲 Fill with favorites"),
-      h("button.btn.soft", { onclick: () => go(`#/shop?w=${dateKey(start)}`) }, "🛒 List"),
-    ),
+    h("button.btn.primary.big.wide", { onclick: () => fillSheet(days) }, "✨ Fill our week"),
     wishesBar(),
-    h("div.week-grid", days.map((day) => {
+    // Days already gone this week stay out of the way until asked for.
+    pastDays && !showPast[dateKey(start)]
+      ? h("button.btn.ghost.center-btn", { onclick: () => { showPast[dateKey(start)] = true; refresh(); } },
+        `Show earlier days (${pastDays})`)
+      : null,
+    h("div.week-grid", days.filter((day) => !pastDays || showPast[dateKey(start)] || dateKey(day) >= today).map((day) => {
       const key = dateKey(day);
       return h(`section.day-card${key === today ? ".today" : ""}${key < today ? ".past" : ""}`,
         h("h2.day-name",

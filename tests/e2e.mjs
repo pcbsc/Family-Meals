@@ -127,7 +127,8 @@ await check("first run sets up the family and the starter menu", async () => {
   await page.getByText("Yes, add them").click();
   await page.locator(".meal-cards").waitFor();
   await page.locator(".tabbar a[data-tab=menu]").click();
-  await page.getByText("38 dishes").waitFor();
+  await page.locator(".tile").first().waitFor();
+  assert.equal(await page.locator(".tile").count(), 38);
 });
 
 await check("servings rescale the ingredients", async () => {
@@ -206,7 +207,7 @@ await check("an Instagram link imports through Claude's web tools (with a pause)
       ? sse([{ type: "server_tool_use", id: "srvtoolu_1", name: "web_fetch", input: { url: "https://www.instagram.com/reel/abc/" } }], "pause_turn")
       : sse([{ type: "tool_use", id: "toolu_1", name: "save_recipe", input: { found: true, problem: "", confidence: "adapted", recipe: recipe() } }], "tool_use");
   await page.goto(BASE + "#/add");
-  await page.getByPlaceholder("https://…").fill("https://www.instagram.com/reel/abc/");
+  await page.getByLabel("Link or recipe").fill("https://www.instagram.com/reel/abc/");
   await page.getByText("Get the recipe").click();
   await page.locator(".screen.edit").waitFor();
   assert.equal(await page.locator(".form input.text").first().inputValue(), "Tteokguk");
@@ -232,7 +233,7 @@ await check("if the API turns down the newer options, it asks again without them
       ? { status: 400, error: { type: "error", error: { type: "invalid_request_error", message: "fallbacks: Extra inputs are not permitted" } } }
       : sse([{ type: "tool_use", id: "toolu_f", name: "save_recipe", input: { found: true, problem: "", confidence: "exact", recipe: recipe({ name: "Hotteok" }) } }], "tool_use");
   await page.goto(BASE + "#/add");
-  await page.getByPlaceholder("https://…").fill("https://seonkyounglongest.com/hotteok/");
+  await page.getByLabel("Link or recipe").fill("https://seonkyounglongest.com/hotteok/");
   await page.getByText("Get the recipe").click();
   await page.locator(".screen.edit").waitFor();
   assert.equal(await page.locator(".form input.text").first().inputValue(), "Hotteok");
@@ -245,7 +246,7 @@ await check("if the API turns down the newer options, it asks again without them
 await check("a post with no recipe explains what to do", async () => {
   reply = () => sse([{ type: "tool_use", id: "toolu_2", name: "save_recipe", input: { found: false, problem: "This post is private.", confidence: "guessed", recipe: recipe({ name: "", ingredients: [], steps: [] }) } }], "tool_use");
   await page.goto(BASE + "#/add");
-  await page.getByPlaceholder("https://…").fill("https://www.instagram.com/p/private/");
+  await page.getByLabel("Link or recipe").fill("https://www.instagram.com/p/private/");
   await page.getByText("Get the recipe").click();
   await page.getByText("couldn't find the recipe").waitFor();
   await page.getByText("This post is private.").waitFor();
@@ -285,7 +286,8 @@ await check("Claude plans the week, fixing a bad dish reference", async () => {
     return sse([{ type: "tool_use", id: `toolu_p${n}`, name: "save_week_plan", input: { summary: "A cozy week!", slots, newDishes: [{ key: "soup", recipe: recipe({ name: "Kongnamul Bap", emoji: "🌱" }) }] } }], "tool_use");
   };
   await page.locator(".tabbar a[data-tab=week]").click();
-  await page.getByText("Plan with Claude").click();
+  await page.getByText("Fill our week").click();
+  await page.getByText("Ask Claude").click();
   await page.getByText("Make our plan").click();
   await page.getByText("A cozy week!").waitFor();
   assert.equal(calls.length, 2);
@@ -299,6 +301,18 @@ await check("Claude plans the week, fixing a bad dish reference", async () => {
   await page.getByText("Use this plan").click();
   await page.locator(".slot-names", { hasText: "Beef Bulgogi + Seasoned Spinach" }).waitFor();
   await page.locator(".slot-names", { hasText: "Kongnamul Bap" }).waitFor();
+});
+
+await check("days already gone this week are folded away", async () => {
+  await page.locator(".tabbar a[data-tab=week]").click();
+  await page.locator(".week-grid").waitFor();
+  const past = (new Date().getDay() - 0 + 7) % 7; // the week starts on Sunday by default
+  assert.equal(await page.locator(".day-card").count(), 7 - past);
+  if (past) {
+    await page.getByText(`Show earlier days (${past})`).click();
+    await page.locator(".day-card.past").first().waitFor();
+    assert.equal(await page.locator(".day-card").count(), 7);
+  }
 });
 
 await check("kids pick today's lunch from the choices", async () => {
@@ -332,7 +346,7 @@ await check("rating with faces shows on the dish", async () => {
 });
 
 await check("a food photo can be added from the gallery", async () => {
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator(".photo-btn", { hasText: "🖼️" }).click()]);
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator(".photo-btn", { hasText: "Add photo" }).click()]);
   await chooser.setFiles(join(ROOT, "icons/icon-512.png"));
   await page.locator(".hero-slide img").waitFor();
 });
@@ -363,7 +377,7 @@ await check("editing shows the recipe's ingredients and steps", async () => {
 await check("a photo added while editing is still there after Save", async () => {
   await page.goto(BASE + "#/edit/seed-kimbap");
   await page.locator(".screen.edit").waitFor();
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByText("🖼️ Choose photo").click()]);
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByText("📷 Add photo").click()]);
   await chooser.setFiles(join(ROOT, "icons/icon-192.png"));
   await page.locator(".toast", { hasText: "Photo added" }).waitFor();
   await page.getByText("💾 Save").click();
@@ -374,11 +388,13 @@ await check("a photo added while editing is still there after Save", async () =>
 await check("a link typed without https:// works, and javascript: links are dropped", async () => {
   await page.goto(BASE + "#/edit/seed-kimbap");
   await page.locator(".screen.edit").waitFor();
+  await page.getByText("More details").click();
   await page.getByPlaceholder("https://…").fill("www.maangchi.com/recipe/kimbap");
   await page.getByText("💾 Save").click();
   await page.locator(".dish-title", { hasText: "Kimbap" }).waitFor();
   assert.equal(await page.locator(".source a").getAttribute("href"), "https://www.maangchi.com/recipe/kimbap");
   await page.goto(BASE + "#/edit/seed-kimbap");
+  await page.getByText("More details").click();
   await page.getByPlaceholder("https://…").fill("javascript:alert(1)");
   await page.getByText("💾 Save").click();
   await page.locator(".dish-title", { hasText: "Kimbap" }).waitFor();
@@ -392,9 +408,9 @@ await check("double-tapping Save adds the dish only once", async () => {
   await page.locator(".dish-title", { hasText: "Double Tap Soup" }).waitFor();
   await page.waitForTimeout(300);
   await page.goto(BASE + "#/menu");
-  await page.getByPlaceholder("🔍 Find a dish or ingredient").fill("Double Tap");
+  await page.getByPlaceholder("🔍 Search").fill("Double Tap");
   assert.equal(await page.locator(".tile", { hasText: "Double Tap Soup" }).count(), 1);
-  await page.getByPlaceholder("🔍 Find a dish or ingredient").fill("");
+  await page.getByPlaceholder("🔍 Search").fill("");
 });
 
 await check("a half-typed recipe survives switching tabs", async () => {
@@ -412,13 +428,11 @@ await check("a half-typed recipe survives switching tabs", async () => {
 
 await check("the shopping list merges the week and remembers ticks", async () => {
   await page.locator(".tabbar a[data-tab=shop]").click();
-  await page.getByText("Whole week").click();
   const ribeye = page.locator(".shop-item", { hasText: "Ribeye" });
   await ribeye.waitFor();
   await ribeye.locator(".shop-btn").click();
   await page.locator(".shop-item.done", { hasText: "Ribeye" }).waitFor();
   await page.reload();
-  await page.getByText("Whole week").click();
   await page.locator(".shop-item.done", { hasText: "Ribeye" }).waitFor({ timeout: 5000 });
 });
 
@@ -440,8 +454,9 @@ await check("a backup file holds everything except the key", async () => {
 
 await check("a damaged backup file is refused and nothing is lost", async () => {
   await page.goto(BASE + "#/menu");
-  await page.getByPlaceholder("🔍 Find a dish or ingredient").fill("");
-  const before = await page.locator(".count").textContent();
+  await page.getByPlaceholder("🔍 Search").fill("");
+  await page.locator(".tile").first().waitFor();
+  const before = await page.locator(".tile").count();
   const data = JSON.parse(readFileSync(backupPath, "utf8"));
   data.dishes.push({ name: "I have no id" });
   const damaged = join(ROOT, "tests/failure-damaged-backup.json");
@@ -452,7 +467,8 @@ await check("a damaged backup file is refused and nothing is lost", async () => 
   await sheet().getByRole("button", { name: "Restore" }).click();
   await page.locator(".toast", { hasText: "Nothing was changed" }).waitFor();
   await page.goto(BASE + "#/menu");
-  assert.equal(await page.locator(".count").textContent(), before);
+  await page.locator(".tile").first().waitFor();
+  assert.equal(await page.locator(".tile").count(), before);
 });
 
 await check("erase everything, then restore from the backup", async () => {
@@ -474,13 +490,14 @@ await check("erase everything, then restore from the backup", async () => {
   await page.locator(".family-faces", { hasText: "😍" }).waitFor();
 });
 
-await check("deleting a dish needs the PIN (restored from backup)", async () => {
+await check("deleting a dish (from Edit) needs the PIN (restored from backup)", async () => {
   await page.goto(BASE + "#/dish/seed-goguma");
   await page.reload(); // grown-up mode stays unlocked for 10 minutes; a reload locks it again
   await page.locator(".dish-title").waitFor();
-  await page.getByText("Delete this dish").click();
+  await page.locator("[aria-label='Edit dish']").click();
   await page.getByText("Grown-ups only").waitFor();
   await enterPin("1234");
+  await page.getByText("Delete this dish").click();
   await sheet().getByRole("button", { name: "Delete" }).click();
   await page.locator(".screen.menu").waitFor();
   assert.equal(await page.locator(".tile", { hasText: "Roasted Sweet Potatoes" }).count(), 0);

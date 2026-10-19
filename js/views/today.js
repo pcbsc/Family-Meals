@@ -5,6 +5,18 @@ import { dateKey, addDays } from "../planner.js";
 import { state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, go, refresh, saveSettings } from "../store.js";
 import { grownUp, dishArt, dishTile, rateSheet, wishFlow, pickDishes } from "../components.js";
 
+function pickFor(date, meal) {
+  pickDishes({
+    meal: meal.key,
+    title: `${meal.emoji} ${meal.label} today`,
+    onPick: async (ids) => {
+      await setSlotDishes(date, meal.key, ids);
+      refresh();
+    },
+  });
+}
+
+/** The next meal, big. */
 function mealCard(date, meal) {
   const slot = getSlot(dateKey(date), meal.key);
   const items = slotDishes(slot);
@@ -12,30 +24,37 @@ function mealCard(date, meal) {
     const kidsChoosing = slot?.choices?.length;
     return h("button.meal-card.empty", {
       style: { "--meal": meal.color },
-      onclick: () => kidsChoosing
-        ? document.querySelector(".kid-choice")?.scrollIntoView({ behavior: "smooth" })
-        : pickDishes({
-          meal: meal.key,
-          title: `${meal.emoji} ${meal.label} today`,
-          onPick: async (ids) => {
-            await setSlotDishes(date, meal.key, ids);
-            refresh();
-          },
-        }),
+      onclick: () => (kidsChoosing ? document.querySelector(".kid-choice")?.scrollIntoView({ behavior: "smooth" }) : pickFor(date, meal)),
     },
       h("span.meal-label", meal.emoji, " ", meal.label),
-      h("span.meal-empty", kidsChoosing ? "🧒 Kids are choosing!" : "Nothing yet. Tap to pick!"),
+      h("span.meal-empty", kidsChoosing ? "🧒 Kids are choosing!" : "➕ Tap to pick"),
     );
   }
   const [first] = items;
-  return h("button.meal-card", {
-    style: { "--meal": meal.color },
-    onclick: () => go(`#/dish/${first.dish.id}`),
-  },
+  return h("button.meal-card", { style: { "--meal": meal.color }, onclick: () => go(`#/dish/${first.dish.id}`) },
     dishArt(first.dish, { kind: "full", className: "art-meal" }),
     h("span.meal-label", meal.emoji, " ", meal.label),
     h("span.meal-name", first.dish.name),
     items.length > 1 ? h("span.meal-more", "with " + items.slice(1).map((i) => i.dish.name).join(", ")) : null,
+  );
+}
+
+/** The day's other meals, small. */
+function mealRow(date, meal) {
+  const slot = getSlot(dateKey(date), meal.key);
+  const items = slotDishes(slot);
+  const kidsChoosing = !items.length && slot?.choices?.length;
+  return h("button.meal-row", {
+    style: { "--meal": meal.color },
+    onclick: () => (items.length ? go(`#/dish/${items[0].dish.id}`) : kidsChoosing ? null : pickFor(date, meal)),
+  },
+    items.length ? dishArt(items[0].dish, { className: "art-sm" }) : h("span.meal-row-emoji", meal.emoji),
+    h("span.meal-row-text",
+      h("span.meal-label", meal.label),
+      items.length
+        ? h("span.meal-name", items.map((i) => i.dish.name).join(" + "))
+        : h("span.meal-empty", kidsChoosing ? "🧒 Kids are choosing" : "➕ Pick"),
+    ),
   );
 }
 
@@ -85,20 +104,6 @@ function lastNight() {
   );
 }
 
-function tomorrow() {
-  const day = addDays(new Date(), 1);
-  const parts = enabledMeals()
-    .map((m) => ({ m, items: slotDishes(getSlot(dateKey(day), m.key)) }))
-    .filter((x) => x.items.length);
-  if (!parts.length) return null;
-  return h("section.card.tomorrow",
-    h("h3", "Tomorrow"),
-    h("div.row.wrap", parts.map(({ m, items }) =>
-      h("button.peek", { onclick: () => go(`#/dish/${items[0].dish.id}`) }, `${m.emoji} ${items[0].dish.name}`),
-    )),
-  );
-}
-
 function grownUpBanners() {
   const out = [];
   if (state.installPrompt) {
@@ -118,7 +123,9 @@ function grownUpBanners() {
   }
   const last = state.settings.lastBackupAt;
   const month = 30 * 24 * 3600 * 1000;
-  if (state.dishes.size > 0 && (!last || Date.now() - last > month) && Date.now() - (state.settings.backupNudgeAt || 0) > 7 * 24 * 3600 * 1000) {
+  // Two weeks in is when a family has recipes and photos worth keeping; no nagging on day one.
+  const settledIn = Date.now() - (state.settings.onboardedAt || Date.now()) > 14 * 24 * 3600 * 1000;
+  if (settledIn && (!last || Date.now() - last > month) && Date.now() - (state.settings.backupNudgeAt || 0) > 7 * 24 * 3600 * 1000) {
     out.push(h("section.card.banner",
       h("span.banner-emoji", "💾"),
       h("div.grow", h("strong", "Time for a backup"), h("p.muted", "Everything lives on this device. A backup file keeps your recipes and photos safe.")),
@@ -141,11 +148,9 @@ export function viewToday() {
   const now = new Date();
   const hour = now.getHours();
   const hello = hour < 11 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  // The next meal comes first: breakfast in the morning, lunch at midday, then dinner.
+  // The next meal is the big card: breakfast in the morning, lunch at midday, then dinner.
   const meals = enabledMeals();
-  const upNext = hour < 10 ? "breakfast" : hour < 14 ? "lunch" : "dinner";
-  const from = Math.max(0, meals.findIndex((m) => m.key === upNext));
-  const orderedMeals = [...meals.slice(from), ...meals.slice(0, from)];
+  const upNext = meals.find((m) => m.key === (hour < 10 ? "breakfast" : hour < 14 ? "lunch" : "dinner")) || meals[0];
   return h("div.screen.today",
     h("header.top",
       h("div", h("h1", `${hello}! 👋`), h("p.muted.date", prettyDate(now))),
@@ -153,13 +158,11 @@ export function viewToday() {
     ),
     kidChoices(now),
     lastNight(),
-    h("div.meal-cards", orderedMeals.map((m) => mealCard(now, m))),
-    tomorrow(),
-    h("div.big-buttons",
-      h("button.btn.big.wish", { onclick: () => wishFlow() }, "🙋 I want to eat…"),
-      h("button.btn.big.soft", { onclick: () => go("#/menu") }, "📖 All our dishes"),
+    h("div.meal-cards",
+      mealCard(now, upNext),
+      h("div.meal-rows", meals.filter((m) => m !== upNext).map((m) => mealRow(now, m))),
     ),
+    h("button.btn.big.wish.wide", { onclick: () => wishFlow() }, "🙋 I want to eat…"),
     grownUpBanners(),
   );
 }
-
