@@ -83,7 +83,7 @@ test(`formatted quantities are always readable (${RUNS} runs)`, () => {
   }
 });
 
-test(`shopping lists from random menus are always sensible (${RUNS} runs)`, () => {
+test(`shopping lists from random menus are always sensible (${RUNS / 10} menus)`, () => {
   const r = rng(4);
   for (let i = 0; i < RUNS / 10; i++) {
     const entries = Array.from({ length: 1 + Math.floor(r() * 12) }, (_, d) => ({
@@ -115,7 +115,7 @@ test(`pasted text and timers never throw (${RUNS} runs)`, () => {
   }
 });
 
-test(`the no-AI planner only fills a spot with a dish meant for it (${RUNS} runs)`, () => {
+test(`the no-AI planner only fills a spot with a dish meant for it (${RUNS / 10} weeks)`, () => {
   const r = rng(6);
   const meals = ["breakfast", "lunch", "dinner", "snack"];
   for (let i = 0; i < RUNS / 10; i++) {

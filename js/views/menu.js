@@ -80,7 +80,8 @@ export function viewMenu({ params }) {
 }
 
 export function viewDiscover() {
-  const have = new Set(dishList().map((d) => d.sourceUrl).filter(Boolean));
+  const key = (url) => String(url || "").toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[/?#]+$/, "");
+  const have = new Set(dishList().map((d) => key(d.sourceUrl)).filter(Boolean));
   const groups = new Map();
   for (const r of DISCOVER) {
     if (!groups.has(r.by)) groups.set(r.by, []);
@@ -93,7 +94,7 @@ export function viewDiscover() {
       h("section.discover-group",
         h("h2", by),
         h("div.discover-list", recipes.map((r) => {
-          const added = have.has(r.url);
+          const added = have.has(key(r.url));
           return h("div.discover-item",
             h("span.discover-emoji", r.emoji),
             h("div.grow", h("strong", r.name), r.nameKo ? h("span.muted.block", r.nameKo) : null),

@@ -1,6 +1,7 @@
 // Settings (grown-ups only, behind the PIN if one is set) and the first-run
 // welcome that sets up the family and the starter menu.
-import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti } from "../ui.js";
+import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti, once } from "../ui.js";
+import { dateKey } from "../planner.js";
 import { MEALS, AVATARS, STARTER_DISHES } from "../seed.js";
 import { state, saveSettings, addStarterDishes, loadAll, go, refresh, db } from "../store.js";
 import { grownUp, backHeader, stepper, chip } from "../components.js";
@@ -72,13 +73,13 @@ function pinSheet() {
   { title: "🔒 Grown-up PIN" });
 }
 
-async function saveBackup() {
+const saveBackup = once(async () => {
   const data = await db.exportAll();
-  downloadFile(`family-menu-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data));
+  downloadFile(`family-menu-backup-${dateKey(new Date())}.json`, JSON.stringify(data));
   await saveSettings({ lastBackupAt: Date.now() });
   toast("Backup saved to Downloads. Keep it somewhere safe (like Google Drive).", { emoji: "💾", ms: 5000 });
   refresh();
-}
+});
 
 function restoreBackup() {
   const input = h("input", { type: "file", accept: "application/json,.json", style: { display: "none" } });
@@ -190,6 +191,7 @@ export async function viewSettings() {
         s.apiKey ? h("button.btn.ghost", { onclick: async () => { await saveSettings({ apiKey: "" }); refresh(); } }, "Remove key") : null,
       ),
       h("p.muted.small", "Typical cost: about 10–15¢ to import a recipe and 25–40¢ to plan a week with new dishes. The key never leaves this device except to talk to Claude, and isn't included in backups."),
+      h("p.muted.small", "What Claude sees: the link, text or photo you import. When planning: your dish names and ratings, the food notes above, and the first names of the family (so it can say who asked for what)."),
     ),
 
     h("section.card",
@@ -230,7 +232,7 @@ export async function viewSettings() {
         }, "🗑️ Erase everything"),
       ),
     ),
-    h("p.muted.small.center", "Family Menu · made for our family · ", h("a", { href: "https://github.com/pcbsc/family-meals#readme", target: "_blank", rel: "noopener" }, "help")),
+    h("p.muted.small.center", "Family Menu · made for our family · ", h("a", { href: "https://github.com/pcbsc/Family-Meals#readme", target: "_blank", rel: "noopener" }, "help")),
   );
 }
 

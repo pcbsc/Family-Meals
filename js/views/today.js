@@ -1,6 +1,6 @@
 // Today: the home screen kids see first. Today's meals, a "pick tonight's
 // dinner" game when a grown-up set choices, "how was last night?", and wishes.
-import { h, confetti, toast, prettyDate } from "../ui.js";
+import { h, confetti, toast, prettyDate, once } from "../ui.js";
 import { dateKey, addDays } from "../planner.js";
 import { state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, go, refresh, saveSettings } from "../store.js";
 import { grownUp, dishArt, dishTile, rateSheet, wishFlow, pickDishes } from "../components.js";
@@ -50,12 +50,12 @@ function kidChoices(date) {
       h("p.muted", "Pick one!"),
       h("div.tile-grid.big", choices.map((dish) =>
         dishTile(dish, {
-          onclick: async () => {
+          onclick: once(async () => {
             await saveSlot({ ...slot, items: [{ dishId: dish.id, servings: state.settings.servings || 4 }], choices: [] });
             confetti();
             toast(`Yay! ${dish.name} for ${meal.label.toLowerCase()}!`, { emoji: "🎉" });
             refresh();
-          },
+          }),
         }),
       )),
     ));
@@ -122,13 +122,16 @@ function grownUpBanners() {
     out.push(h("section.card.banner",
       h("span.banner-emoji", "💾"),
       h("div.grow", h("strong", "Time for a backup"), h("p.muted", "Everything lives on this device. A backup file keeps your recipes and photos safe.")),
-      h("button.btn.soft", {
-        onclick: async () => {
-          await saveSettings({ backupNudgeAt: Date.now() });
-          if (await grownUp()) go("#/settings");
-          else refresh();
-        },
-      }, "Back up"),
+      h("div.row",
+        h("button.btn.ghost", { onclick: async () => { await saveSettings({ backupNudgeAt: Date.now() }); refresh(); } }, "Later"),
+        h("button.btn.soft", {
+          onclick: async () => {
+            await saveSettings({ backupNudgeAt: Date.now() });
+            if (await grownUp()) go("#/settings");
+            else refresh();
+          },
+        }, "Back up"),
+      ),
     ));
   }
   return out;

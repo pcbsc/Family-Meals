@@ -27,20 +27,23 @@ spaghetti and salmon.
 
 ## 1. Put it online (once, about 2 minutes)
 
-The app is a website that installs on the tablet like a real app. GitHub hosts it for free.
+The app is a website that installs on the tablet like a real app. GitHub hosts it for free,
+but only for **public** repositories (private ones need a paid plan).
 
-1. On GitHub, open this repository → **Settings** → **Pages** (left side).
-2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-3. Set **Branch** to **main** and the folder to **/ (root)**, then **Save**.
-4. Wait a minute or two. The address appears at the top of that page:
-   **https://pcbsc.github.io/family-meals/**
+1. On GitHub, open this repository → **Settings**. At the bottom of the **General** page,
+   under **Danger Zone**, choose **Change visibility → Make public**.
+2. Still in **Settings**, open **Pages** (left side).
+3. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+4. Set **Branch** to **main** and the folder to **/ (root)**, then **Save**.
+5. Wait a minute or two. The address appears at the top of that page:
+   **https://pcbsc.github.io/Family-Meals/**
 
 Only the app's code is public. Your recipes, photos, ratings and Claude key stay on
 your own device and are never uploaded to GitHub.
 
 ## 2. Install it on the Android tablet or phone
 
-1. Open **https://pcbsc.github.io/family-meals/** in **Chrome**.
+1. Open **https://pcbsc.github.io/Family-Meals/** in **Chrome**.
 2. Tap the **⋮** menu → **Install app** (on some phones it's **Add to Home screen**).
    The app may also offer an **Install** button on its Today screen.
 3. Open **Family Menu** from the home screen and follow the welcome steps: family
@@ -63,6 +66,10 @@ dishes from the web. "Fill with favorites" and everything else are free and work
 The key is saved only on this device. It isn't put in backup files, and it's only ever
 sent to Claude.
 
+**What Claude sees:** the link, caption or photo you import. When planning a week: your
+dish names and ratings, the food notes in Settings, and the family's first names (so the
+plan can say who asked for what). Nothing else leaves the device.
+
 ## Sharing recipes from Instagram or TikTok
 
 After the app is installed (step 2), Android lists it in the **Share** menu:
@@ -80,7 +87,8 @@ Family Menu too.
 ## Grown-up PIN
 
 In **⚙️ Settings → 🔒 Grown-up PIN**, set a 4-digit PIN. Then Settings, editing,
-deleting and clearing the week ask for it. Kids can still look at everything, cook along,
+deleting and clearing the week ask for it. If you forget it, tap **Forgot the PIN?** on the
+PIN screen and answer the sum it shows; that removes the PIN. Kids can still look at everything, cook along,
 rate, wish, add photos and pick dinner.
 
 ## Backups (important)
@@ -121,7 +129,9 @@ A static web app with no build step. Open `index.html` through any web server.
 
 ```sh
 npm install        # dev tools only: esbuild, Playwright, the SDK source
-npm test           # unit tests (Node)
+npm test           # unit tests, including fuzz tests (3,000 random inputs each)
+npm run fuzz       # the fuzz tests with 30,000 inputs each
+npm run lint       # eslint (installed separately)
 npm run e2e        # drives the app in Chromium with Claude's API mocked
 npm run vendor     # rebuild vendor/anthropic-sdk.mjs and the font after an upgrade
 npm run icons      # re-render icons/*.png from icons/icon.svg

@@ -8,6 +8,8 @@
     "vendor": "node tools/vendor.mjs",
     "icons": "node tools/icons.mjs",
     "test": "node --test tests/unit/*.test.mjs",
+    "fuzz": "FUZZ_RUNS=30000 node --test tests/unit/fuzz.test.mjs",
+    "lint": "eslint js sw.js tools tests",
     "e2e": "node tests/e2e.mjs",
     "serve": "npx http-server -p 8080 -c-1 ."
   },

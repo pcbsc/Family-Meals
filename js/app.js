@@ -1,6 +1,6 @@
 // Family Menu: starts the app, picks the screen for the address bar's #/route,
 // and keeps the tab bar in step.
-import { h, clearChildren } from "./ui.js";
+import { h, clearChildren, toast } from "./ui.js";
 import { state, loadAll, setRedraw, go } from "./store.js";
 import { askToKeepData } from "./db.js";
 import { viewToday } from "./views/today.js";
@@ -76,7 +76,12 @@ async function render({ keepScroll = false } = {}) {
   clearChildren(view);
   view.append(node);
   document.body.dataset.full = route.full ? "1" : "";
-  for (const a of document.querySelectorAll(".tabbar a")) a.classList.toggle("on", a.dataset.tab === route.tab);
+  for (const a of document.querySelectorAll(".tabbar a")) {
+    const on = a.dataset.tab === route.tab;
+    a.classList.toggle("on", on);
+    if (on) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  }
   currentKey = raw;
   currentRoute = route;
   requestAnimationFrame(() => window.scrollTo(0, y));
@@ -90,6 +95,14 @@ async function start() {
     return;
   }
   askToKeepData();
+  // Anything that fails to save gets said out loud instead of silently lost.
+  window.addEventListener("unhandledrejection", (e) => {
+    console.error(e.reason);
+    const full = e.reason?.name === "QuotaExceededError";
+    toast(full
+      ? "This device is out of space, so that wasn't saved. Save a backup, then remove some photos."
+      : "Something didn't save. Please try again.", { emoji: "😕", ms: 6000 });
+  });
   setRedraw(render);
   window.addEventListener("hashchange", () => {
     state.navCount++;
