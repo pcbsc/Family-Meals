@@ -145,3 +145,12 @@ test("keeps look-alike items in the right aisle", () => {
   assert.equal(aisleFor("peanut butter"), "pantry");
   assert.equal(aisleFor("pepperoni"), "meat");
 });
+
+test("whole things round up on the shopping list", () => {
+  const tacos = { name: "Tacos", servings: 4, ingredients: ["1 avocado, sliced", "3 cloves garlic", "2 apples"] };
+  const list = buildGroceryList([{ dish: tacos, servings: 3 }]);
+  const byKey = Object.fromEntries(list.map((i) => [i.key, i]));
+  assert.equal(byKey["avocado"].amount, "1");
+  assert.equal(byKey["garlic"].amount, "3 cloves");
+  assert.equal(byKey["apple"].amount, "2");
+});

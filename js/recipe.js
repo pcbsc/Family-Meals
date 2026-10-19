@@ -234,12 +234,14 @@ function amountText(bucket) {
     const g = bucket.weightMetric;
     parts.push(g >= 1000 ? `${formatQty(g / 1000, "kg")} kg` : `${formatQty(g, "g")} g`);
   }
+  // You can't buy ¾ of an avocado: whole things round up on the shopping list.
+  const whole = (n) => String(Math.max(1, Math.ceil(n - 0.05)));
   for (const [unit, n] of Object.entries(bucket.counts)) {
     const plural = n > 1.01 ? (unit.endsWith("ch") || unit.endsWith("sh") || unit === "box" ? "es" : unit === "leaf" ? "" : "s") : "";
     const word = unit === "leaf" && n > 1.01 ? "leaves" : unit + plural;
-    parts.push(`${formatQty(n)} ${word}`);
+    parts.push(`${unit === "pinch" || unit === "dash" || unit === "inch" ? formatQty(n) : whole(n)} ${word}`);
   }
-  if (bucket.plain) parts.push(formatQty(bucket.plain));
+  if (bucket.plain) parts.push(whole(bucket.plain));
   return parts.join(" + ");
 }
 
