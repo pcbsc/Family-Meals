@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { videoInfo, isVideoLink, PLAYER_ORIGINS } from "../../js/video.js";
+import { videoInfo, isVideoLink, videoSeenIn, PLAYER_ORIGINS } from "../../js/video.js";
 
 test("YouTube links of every shape", () => {
   const id = "i1djfV9uigc";
@@ -94,4 +94,30 @@ test("players only ever come from the sites index.html allows", () => {
     }
     assert.match(v.watchUrl, /^https?:\/\//, link);
   }
+});
+
+test("a video only counts as seen if its id is in what Claude read or was given", async () => {
+  const { toolEvidence } = await import("../../js/ai.js");
+  const reply = [
+    { type: "text", text: "I remember https://www.youtube.com/watch?v=MadeUpVid01" },
+    { type: "web_search_tool_result", content: [{ type: "web_search_result", url: "https://www.youtube.com/watch?v=i1djfV9uigc", title: "Japchae" }] },
+    { type: "web_fetch_tool_result", content: { type: "web_fetch_result", url: "https://vm.tiktok.com/ZMabc123/", content: { type: "document", source: { type: "text", data: "<blockquote cite=\"https://www.tiktok.com/@cook/video/7398765432109876543\">" } } } },
+    // Results that came back through the tools' own filtering code.
+    { type: "code_execution_tool_result", content: { type: "code_execution_result", stdout: "https://youtu.be/EEa5F7YxwdY Easy japchae" } },
+    { type: "tool_use", name: "save_video", input: { url: "https://youtu.be/AAAAAAAAAAA" } },
+  ];
+  const seen = toolEvidence(reply);
+  assert.ok(videoSeenIn("https://youtu.be/i1djfV9uigc", seen), "a search result");
+  assert.ok(videoSeenIn("https://www.tiktok.com/@cook/video/7398765432109876543", seen), "a link inside a page Claude read");
+  assert.ok(videoSeenIn("https://www.youtube.com/shorts/EEa5F7YxwdY", seen), "filtered results");
+  assert.ok(!videoSeenIn("https://www.youtube.com/watch?v=MadeUpVid01", seen), "Claude's own words don't count");
+  assert.ok(!videoSeenIn("https://youtu.be/AAAAAAAAAAA", seen), "nor its tool call");
+  assert.ok(!videoSeenIn("", seen));
+  assert.ok(videoSeenIn("https://vm.tiktok.com/ZMabc123/", ["shared: https://vm.tiktok.com/ZMabc123/"]), "a short link the family shared");
+  assert.deepEqual(toolEvidence(null), []);
+});
+
+test("an impossible start time is ignored", () => {
+  assert.doesNotMatch(videoInfo("https://youtu.be/i1djfV9uigc?t=99999999999999999999").embedUrl, /start/);
+  assert.match(videoInfo("https://youtu.be/i1djfV9uigc?t=1h").embedUrl, /&start=3600$/);
 });

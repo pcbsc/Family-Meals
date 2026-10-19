@@ -9,6 +9,7 @@ import {
   findTimers,
   parseRecipeText,
   aisleFor,
+  findLink,
 } from "../../js/recipe.js";
 
 test("reads quantities, units and notes", () => {
@@ -193,4 +194,21 @@ test("new starter ingredients land in the right aisle", () => {
     "peanut": "pantry", "pizza sauce": "pantry",
   };
   for (const [item, aisle] of Object.entries(cases)) assert.equal(aisleFor(item), aisle, item);
+});
+
+test("a comma inside brackets is part of the name, not the start of a note", () => {
+  const p = parseIngredient("1 can (15 oz, drained) chickpeas");
+  assert.equal(p.unit, "can");
+  assert.equal(normalizeItemName(p.item), "chickpea");
+  assert.equal(parseIngredient("1 lb chicken thighs (boneless, skinless), cut up").note, "cut up");
+  const list = buildGroceryList([{ dish: { name: "Salad", ingredients: ["1 can (15 oz, drained) chickpeas"], servings: 4 }, servings: 4 }]);
+  assert.deepEqual(list.map((i) => [i.key, i.aisle]), [["chickpea", "pantry"]]);
+});
+
+test("links are found without the punctuation around them", () => {
+  assert.equal(findLink("Watch this (https://youtu.be/i1djfV9uigc)."), "https://youtu.be/i1djfV9uigc");
+  assert.equal(findLink("So good! https://www.tiktok.com/@cook/video/7398765432109876543!!"), "https://www.tiktok.com/@cook/video/7398765432109876543");
+  assert.equal(findLink("https://en.wikipedia.org/wiki/Kimchi_(food)"), "https://en.wikipedia.org/wiki/Kimchi_(food)");
+  assert.equal(findLink("no link here"), "");
+  assert.equal(findLink(null), "");
 });

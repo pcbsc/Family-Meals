@@ -1,6 +1,6 @@
 // Family Menu: starts the app, picks the screen for the address bar's #/route,
 // and keeps the tab bar in step.
-import { h, clearChildren, toast } from "./ui.js";
+import { h, toast } from "./ui.js";
 import { state, loadAll, setRedraw, saveSettings, go, addNewStarters } from "./store.js";
 import { askToKeepData } from "./db.js";
 import { viewToday } from "./views/today.js";
@@ -73,8 +73,21 @@ async function render({ keepScroll = false } = {}) {
   if (token !== renderToken || node == null) return;
 
   const view = document.getElementById("view");
-  clearChildren(view);
+  // A video that's playing keeps playing when its screen redraws (after a heart or
+  // a rating). Chrome can move a live player without reloading it; elsewhere it restarts.
+  const playing = keepScroll && raw === currentKey ? view.querySelector(".video[data-key] iframe")?.parentElement : null;
+  const old = [...view.childNodes];
   view.append(node);
+  const spot = playing && [...(node.querySelectorAll?.(".video[data-key]") || [])].find((el) => el.dataset.key === playing.dataset.key);
+  if (spot && typeof spot.parentNode.moveBefore === "function") {
+    try {
+      spot.parentNode.moveBefore(playing, spot);
+      spot.remove();
+    } catch {
+      // The new screen keeps its own (stopped) player.
+    }
+  }
+  for (const n of old) n.remove();
   document.body.dataset.full = route.full ? "1" : "";
   for (const a of document.querySelectorAll(".tabbar a")) {
     const on = a.dataset.tab === route.tab;

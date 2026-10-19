@@ -43,7 +43,7 @@ function sse(content, stopReason) {
     if (block.type === "tool_use" || block.type === "server_tool_use") {
       events.push({ type: "content_block_start", index, content_block: { ...block, input: {} } });
       events.push({ type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: JSON.stringify(block.input) } });
-    } else if (block.type === "web_search_tool_result") {
+    } else if (block.type.endsWith("_tool_result")) {
       events.push({ type: "content_block_start", index, content_block: block });
     } else {
       events.push({ type: "content_block_start", index, content_block: { type: "text", text: "" } });
@@ -174,6 +174,8 @@ await check("Discover has trending, Korean and American ideas, with what testers
   await page.goto(BASE + "#/discover");
   await page.getByText("Salmon Rice Bowl").waitFor();
   await page.getByText("worth the hype").first().waitFor();
+  // The salmon bowl is already a starter with the same TikTok.
+  await page.locator(".discover-item", { hasText: "Salmon Rice Bowl" }).getByText("In menu").waitFor();
   await page.locator(".filter", { hasText: "Korean" }).click();
   await page.getByRole("heading", { name: "Seonkyoung Longest" }).waitFor();
   await page.getByText("Jjajangmyeon").first().waitFor();
@@ -192,6 +194,13 @@ await check("a trending dish plays the creator's video right in the app", async 
     "https://www.tiktok.com/player/v1/7010506729012219141?rel=0&description=1&autoplay=1");
   // The player really loads (the page's security rules allow it).
   await page.frameLocator(".video-card iframe").getByText("fake player").waitFor();
+  // Tapping the heart while it plays doesn't restart it.
+  const player = () => page.frames().find((f) => f.url().includes("tiktok.com/player"));
+  await player().evaluate(() => (window.stillPlaying = true));
+  await page.locator(".dish-actions .action", { hasText: "Favorite" }).click();
+  await page.locator(".dish-actions .action[aria-pressed=true]").waitFor();
+  assert.equal(await player().evaluate(() => window.stillPlaying), true, "the video kept playing");
+  await page.locator(".dish-actions .action", { hasText: "Favorite" }).click();
 });
 
 await check("cook-along keeps the video on screen while the steps change", async () => {
@@ -329,7 +338,7 @@ await check("an Instagram link imports through Claude's web tools (with a pause)
   reply = (body, n) =>
     n === 1
       ? sse([{ type: "server_tool_use", id: "srvtoolu_1", name: "web_fetch", input: { url: "https://www.instagram.com/reel/abc/" } }], "pause_turn")
-      : sse([{ type: "tool_use", id: "toolu_1", name: "save_recipe", input: { found: true, problem: "", confidence: "adapted", recipe: recipe() } }], "tool_use");
+      : sse([{ type: "tool_use", id: "toolu_1", name: "save_recipe", input: { found: true, problem: "", confidence: "adapted", recipe: recipe({ videoUrl: "https://www.youtube.com/watch?v=MadeUpVid01" }) } }], "tool_use");
   await page.goto(BASE + "#/add");
   await page.getByLabel("Link or recipe").fill("https://www.instagram.com/reel/abc/");
   await page.getByText("Get the recipe").click();
@@ -345,6 +354,7 @@ await check("an Instagram link imports through Claude's web tools (with a pause)
   assert.equal(first.body.tool_choice.type, "auto");
   assert.equal(calls[1].body.messages.length, 2, "the paused turn is sent back to continue");
   assert.equal(calls[1].body.messages[1].role, "assistant");
+  assert.equal(await page.getByLabel("Video link").inputValue(), "", "a video link Claude never saw is dropped");
   await page.getByText("💾 Save").click();
   await page.locator(".dish-title", { hasText: "Tteokguk" }).waitFor();
   await page.getByText("Seonkyoung Longest ↗").waitFor();
@@ -399,6 +409,21 @@ await check("TikTok links shared from Android get the caption link too", async (
   await page.getByText("💾 Save").click();
   await page.locator(".dish-title", { hasText: "TikTok Egg Toast" }).waitFor();
   await page.getByText("@cook on TikTok").waitFor();
+});
+
+await check("a short TikTok link becomes the full video Claude read, so it plays in the app", async () => {
+  const full = "https://www.tiktok.com/@cook/video/7311111111111111111";
+  reply = () => sse([
+    { type: "server_tool_use", id: "srvtoolu_t", name: "web_fetch", input: { url: "https://vm.tiktok.com/ZMabc123/" } },
+    { type: "web_fetch_tool_result", tool_use_id: "srvtoolu_t", content: { type: "web_fetch_result", url: "https://vm.tiktok.com/ZMabc123/", retrieved_at: null, content: { type: "document", title: null, citations: null, source: { type: "text", media_type: "text/plain", data: `<blockquote cite="${full}">Garlic noodles</blockquote>` } } } },
+    { type: "tool_use", id: "toolu_t", name: "save_recipe", input: { found: true, problem: "", confidence: "adapted", recipe: recipe({ name: "Garlic Noodles", videoUrl: full }) } },
+  ], "tool_use");
+  await page.goto(BASE + "#/add");
+  await page.getByLabel("Link or recipe").fill("Try this (https://vm.tiktok.com/ZMabc123/).");
+  await page.getByText("Get the recipe").click();
+  await page.locator(".screen.edit").waitFor();
+  assert.equal(await page.getByLabel("Video link").inputValue(), full);
+  await page.locator(".tabbar a[data-tab=menu]").click();
 });
 
 await check("Claude plans the week, fixing a bad dish reference", async () => {

@@ -46,7 +46,9 @@ function mealRow(date, meal) {
   const kidsChoosing = !items.length && slot?.choices?.length;
   return h("button.meal-row", {
     style: { "--meal": meal.color },
-    onclick: () => (items.length ? go(`#/dish/${items[0].dish.id}`) : kidsChoosing ? null : pickFor(date, meal)),
+    onclick: () => (items.length
+      ? go(`#/dish/${items[0].dish.id}`)
+      : kidsChoosing ? document.querySelector(".kid-choice")?.scrollIntoView({ behavior: "smooth" }) : pickFor(date, meal)),
   },
     items.length ? dishArt(items[0].dish, { className: "art-sm" }) : h("span.meal-row-emoji", meal.emoji),
     h("span.meal-row-text",

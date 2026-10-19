@@ -103,7 +103,8 @@ Family Menu too.
   steps while you swipe through them; tap 📺 again to hide it.
 - To change or remove a video, tap **Change** next to it.
 
-Nothing is loaded from the video site until you tap ▶, and videos need the internet. A
+Only a YouTube preview picture loads before you tap ▶ (TikTok and Instagram show a plain
+▶ until then), and videos need the internet. A
 short TikTok share link (vm.tiktok.com/…) opens in TikTok instead of playing in the app.
 For a starter recipe, the video is the creator's version, so their amounts may differ a little.
 

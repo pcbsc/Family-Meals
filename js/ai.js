@@ -4,7 +4,7 @@
 import Anthropic from "../vendor/anthropic-sdk.mjs";
 import { MEALS, CATEGORIES } from "./seed.js";
 import { cleanLink } from "./recipe.js";
-import { videoInfo } from "./video.js";
+import { videoInfo, videoSeenIn } from "./video.js";
 
 const MODEL = "claude-opus-5-5";
 // If Claude's safety filters ever decline a request, the API retries it on the
@@ -150,14 +150,32 @@ function friendly(err) {
 }
 
 /**
- * Runs a conversation with the web tools until Claude calls `toolName`.
- * validate(input, seenUrls) returns an error message to send back, or null when
- * it's good. seenUrls holds every link web_search returned along the way.
+ * Every piece of text inside the web tools' results in a reply: the pages Claude
+ * read and the links its searches found (whether the results came straight back
+ * or through the tools' own result filtering). Claude's own words aren't included.
  */
-async function runUntilTool({ apiKey, system, content, tools, toolName, effort, maxTokens, validate, onProgress, signal }) {
+export function toolEvidence(content) {
+  const out = [];
+  const walk = (v) => {
+    if (typeof v === "string") out.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === "object") Object.values(v).forEach(walk);
+  };
+  for (const block of Array.isArray(content) ? content : []) {
+    if (/_tool_result$/.test(block?.type || "")) walk(block.content);
+  }
+  return out;
+}
+
+/**
+ * Runs a conversation with the web tools until Claude calls `toolName`.
+ * validate(input, evidence) returns an error message to send back, or null when
+ * it's good. evidence (pass an array to keep it) collects toolEvidence() from
+ * every reply along the way.
+ */
+async function runUntilTool({ apiKey, system, content, tools, toolName, effort, maxTokens, validate, onProgress, signal, evidence = [] }) {
   const api = client(apiKey);
   const messages = [{ role: "user", content }];
-  const seenUrls = new Set();
   // The refusal fallback and streamed tool input are newer API options. If the
   // API ever turns one down, ask again once without them rather than failing.
   let extras = true;
@@ -195,18 +213,14 @@ async function runUntilTool({ apiKey, system, content, tools, toolName, effort, 
         message = await send();
       }
 
-      for (const block of message.content) {
-        if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
-          for (const r of block.content) if (typeof r?.url === "string") seenUrls.add(r.url);
-        }
-      }
+      evidence.push(...toolEvidence(message.content));
       if (message.stop_reason === "refusal") {
         throw new FriendlyError("Claude couldn't help with this one. Try a different link or photo.");
       }
       const call = message.content.find((b) => b.type === "tool_use" && b.name === toolName);
       if (call) {
         if (message.stop_reason === "max_tokens") throw new FriendlyError("That was too long for Claude to finish. Try again.");
-        const problem = validate(call.input, seenUrls);
+        const problem = validate(call.input, evidence);
         if (!problem) return call.input;
         messages.push(
           { role: "assistant", content: message.content },
@@ -281,7 +295,7 @@ How to work:
 - Keep the original amounts and units. Don't invent ingredients the recipe doesn't use.
 - Write the steps in your own words, short and simple, one action each, so a 7-year-old helper can follow along with a grown-up.
 - Fill in the Korean name in Hangul for Korean dishes.
-- Set videoUrl so the family can watch while they cook: the post itself if it's a video, otherwise the creator's own video of this recipe if the page embeds or links one. Only use a link you actually saw; never make one up.
+- Set videoUrl so the family can watch while they cook: the post itself if it's a video, otherwise the creator's own video of this recipe if the page embeds or links one. For a short TikTok link (vm.tiktok.com/…), give the full tiktok.com/@account/video/<number> link it leads to. Only use a link that appears in what you were given or read; never make one up.
 - If there's truly nothing recipe-like (for example a private or deleted post), call save_recipe with found=false, a short friendly problem, and empty placeholders in the recipe.
 
 Finish by calling save_recipe exactly once.`;
@@ -304,8 +318,11 @@ export async function importRecipe({ apiKey, url, text, image, onProgress, signa
   if (image) content.push({ type: "image", source: { type: "base64", media_type: image.media_type, data: image.data } });
   content.push({ type: "text", text: parts.join("\n\n") });
 
+  // What Claude was given or read; a video link has to come from here, not from memory.
+  const evidence = [url, text].filter(Boolean);
   const result = await runUntilTool({
     apiKey,
+    evidence,
     system: IMPORT_SYSTEM,
     content,
     tools: [...(url || text ? WEB_TOOLS : []), SAVE_RECIPE_TOOL],
@@ -324,8 +341,12 @@ export async function importRecipe({ apiKey, url, text, image, onProgress, signa
   }
   const recipe = cleanRecipe(result.recipe);
   if (!recipe.sourceUrl && url) recipe.sourceUrl = url;
-  // A recipe shared from a video post keeps the video.
-  if (!recipe.videoUrl && url && videoInfo(url)) recipe.videoUrl = cleanLink(url);
+  // A made-up video link could play anything, so only keep one Claude actually saw.
+  if (!videoSeenIn(recipe.videoUrl, evidence)) recipe.videoUrl = "";
+  // A recipe shared from a video post keeps that video, unless it's a short link
+  // and Claude found the full one (which plays inside the app).
+  const posted = url && videoInfo(url) ? cleanLink(url) : "";
+  if (posted && (!recipe.videoUrl || videoInfo(posted).embedUrl)) recipe.videoUrl = posted;
   return { found: true, problem: "", confidence: result.confidence || "adapted", recipe };
 }
 
@@ -365,8 +386,10 @@ export async function planWeek({ apiKey, request, menuIds, onProgress, signal })
     for (const n of input.newDishes) if (!cleanRecipe(n?.recipe)) bad.push(`new:${n?.key}`);
     return bad.length ? `These dish references don't match the menu or newDishes: ${bad.slice(0, 10).join(", ")}. Use ids from the menu or 'new:<key>' for complete new dishes.` : null;
   };
+  const evidence = [];
   const result = await runUntilTool({
     apiKey,
+    evidence,
     system: PLAN_SYSTEM,
     content: [{ type: "text", text: `Here is everything you need, as JSON:\n${JSON.stringify(request, null, 1)}` }],
     tools: [...(request.newIdeas > 0 ? WEB_TOOLS : []), SAVE_PLAN_TOOL],
@@ -380,6 +403,7 @@ export async function planWeek({ apiKey, request, menuIds, onProgress, signal })
   const newDishes = (result.newDishes || [])
     .map((n) => ({ key: str(n.key), recipe: cleanRecipe(n.recipe) }))
     .filter((n) => n.key && n.recipe);
+  for (const n of newDishes) if (!videoSeenIn(n.recipe.videoUrl, evidence)) n.recipe.videoUrl = "";
   const newKeys = new Set(newDishes.map((n) => n.key));
   const slots = (result.slots || [])
     .filter((s) => s && wanted.has(`${s.date}|${s.meal}`))
@@ -437,16 +461,11 @@ export async function findVideo({ apiKey, dish, onProgress, signal }) {
     maxTokens: 8000,
     onProgress,
     signal,
-    validate: (input, seenUrls) => {
+    validate: (input, evidence) => {
       if (input?.found === false) return null;
-      const info = videoInfo(str(input?.url));
-      if (!info) return "That link isn't a YouTube, TikTok or Instagram video. Use a video link from your search results.";
-      // A made-up link would play the wrong video (or nothing), so it has to be one the search really found.
-      const seen = [...seenUrls].some((u) => {
-        const other = videoInfo(u);
-        return other && other.site === info.site && (info.id ? other.id === info.id : other.watchUrl === info.watchUrl);
-      });
-      return seen ? null : "That video wasn't in your search results. Search, then pick a video link from the results.";
+      if (!videoInfo(str(input?.url))) return "That link isn't a YouTube, TikTok or Instagram video. Use a video link from your search results.";
+      // A made-up link would play the wrong video (or anything at all), so it has to be one the search really found.
+      return videoSeenIn(str(input.url), evidence) ? null : "That video wasn't in your search results. Search, then pick a video link from the results.";
     },
   });
   if (result.found === false) {

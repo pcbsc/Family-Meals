@@ -90,7 +90,14 @@ export function parseIngredient(line) {
     }
     rest = rest.replace(/^of\s+/i, "");
   }
-  const comma = rest.indexOf(",");
+  // The note starts at the first comma outside brackets: "1 can (15 oz, drained) chickpeas".
+  let depth = 0;
+  let comma = -1;
+  for (let i = 0; i < rest.length && comma < 0; i++) {
+    if (rest[i] === "(" || rest[i] === "[") depth++;
+    else if ((rest[i] === ")" || rest[i] === "]") && depth > 0) depth--;
+    else if (rest[i] === "," && depth === 0) comma = i;
+  }
   if (comma > 0) {
     out.item = rest.slice(0, comma).trim();
     out.note = rest.slice(comma + 1).trim();
@@ -203,7 +210,7 @@ const AISLE_WORDS = [
   ["grains", /\brice\b|noodle|pasta|spaghetti|macaroni|bread|tortilla|\bflour\b|oats|oatmeal|flatbread|pita|naan|pizza dough|cereal|granola|\bbuns?\b|bagel|cracker/],
   ["dairy", /\beggs?\b|milk|half-and-half|butter|cheese|yogurt|yoghurt|cream|mozzarella|parmesan|cheddar|hummus/],
   ["produce", /onion|garlic|ginger|carrot|spinach|zucchini|squash|potato|cabbage|lettuce|cucumber|tomato|pepper(?!corn)|jalape|\bchil(?:i|e)s?\b|mushroom|sprout|radish|apple|banana|berr|lemon|lime|orange|avocado|cilantro|parsley|basil|broccoli|celery|pear|fruit|kale|corn|\bpeas?\b|chive|herb|grape|melon|mango|peach|kiwi|eggplant|asparagus|green bean|bok choy|napa|leek|shallot|scallion|thyme|rosemary|mint|dill/],
-  ["pantry", /\boil\b|sugar|\bsalt\b|soy sauce|vinegar|honey|sesame seed|spice|cumin|paprika|oregano|cinnamon|vanilla|syrup|ketchup|mustard|mayo|cornstarch|starch|bouillon|salsa|beans|tuna|nut|raisin|chocolate|jam|seasoning|baking|\bbeans?\b|almond|yeast|sriracha/],
+  ["pantry", /\boil\b|sugar|\bsalt\b|soy sauce|vinegar|honey|sesame seed|spice|cumin|paprika|oregano|cinnamon|vanilla|syrup|ketchup|mustard|mayo|cornstarch|starch|bouillon|salsa|beans|tuna|nut|raisin|chocolate|jam|seasoning|baking|\bbeans?\b|chickpea|lentil|almond|yeast|sriracha/],
 ];
 
 /** Things most kitchens already have; the list shows them apart so nobody buys a fifth bottle of soy sauce. */
@@ -338,6 +345,17 @@ export function stripStepNumber(step) {
  * Makes a link safe to put behind a button: adds https:// when someone typed
  * "www.site.com/…", and refuses anything that isn't a web address (javascript:, data:…).
  */
+/** The first web link in some text, without the punctuation around it: "(see https://youtu.be/x)." */
+export function findLink(text) {
+  let url = String(text ?? "").match(/https?:\/\/[^\s"'<>]+/i)?.[0] || "";
+  for (;;) {
+    const last = url.at(-1);
+    const unopened = last === ")" && url.split("(").length < url.split(")").length;
+    if (url && (".,;:!?]}".includes(last) || unopened)) url = url.slice(0, -1);
+    else return url;
+  }
+}
+
 export function cleanLink(text) {
   let s = String(text ?? "").trim();
   if (!s) return "";

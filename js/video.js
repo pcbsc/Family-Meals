@@ -25,6 +25,12 @@ function seconds(t) {
   return (Number(m[1]) || 0) * 3600 + (Number(m[2]) || 0) * 60 + (Number(m[3]) || 0);
 }
 
+// A start time past a day is a typo; start at the beginning.
+const startAt = (t) => {
+  const n = seconds(t);
+  return n > 0 && n <= 86400 ? n : 0;
+};
+
 function youtube(u) {
   const host = u.hostname.replace(/^(www|m|music)\./, "");
   let id = "";
@@ -39,7 +45,7 @@ function youtube(u) {
     }
   } else return null;
   if (!YT_ID.test(id)) return null;
-  const start = seconds(u.searchParams.get("t") || u.searchParams.get("start") || "");
+  const start = startAt(u.searchParams.get("t") || u.searchParams.get("start") || "");
   return {
     site: "youtube",
     id,
@@ -144,6 +150,17 @@ export function videoInfo(link) {
   if (u.protocol !== "https:" && u.protocol !== "http:") return null;
   const info = youtube(u) || tiktok(u) || instagram(u) || vimeo(u);
   return info && { ...info, siteName: SITE_NAMES[info.site] };
+}
+
+/**
+ * True if the video appears in any of the texts (pages Claude read, search
+ * results, what the family pasted): its id, or for a short link the link itself.
+ */
+export function videoSeenIn(link, texts) {
+  const v = videoInfo(link);
+  if (!v) return false;
+  const needle = v.id || v.watchUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return texts.some((t) => typeof t === "string" && t.includes(needle));
 }
 
 /** True if the link is a video the app can show or open. */

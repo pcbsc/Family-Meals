@@ -2,12 +2,10 @@
 // photo or screenshot, pasted text, or write our own. Edit: the recipe form.
 import { h, toast, openSheet, confirmSheet, preparePhoto, pickImage, imageForClaude, clearChildren, once } from "../ui.js";
 import { MEALS, CATEGORIES, SPICE } from "../seed.js";
-import { parseRecipeText, stripStepNumber, cleanLink } from "../recipe.js";
+import { parseRecipeText, stripStepNumber, cleanLink, findLink } from "../recipe.js";
 import { isVideoLink } from "../video.js";
 import { state, blankDish, saveDish, updateDish, deleteDish, addPhoto, go, redrawScreen, db } from "../store.js";
 import { backHeader, stepper, chip, progressSheet, needKeySheet, dishArt } from "../components.js";
-
-const URL_RE = /https?:\/\/[^\s"'<>]+/i;
 
 function notFoundSheet(problem) {
   openSheet((close) =>
@@ -68,7 +66,7 @@ export async function viewAdd({ params }) {
     const shared = await db.takeSharedItem();
     if (shared) {
       const all = [shared.title, shared.text, shared.url].filter(Boolean).join("\n");
-      const found = (shared.url || all).match(URL_RE)?.[0] || "";
+      const found = findLink(shared.url || all);
       const caption = all.replace(found, "").trim();
       if (hasKey) {
         setTimeout(() => runImport({ url: found, text: caption.length > 30 ? caption : "", imageFile: shared.image }), 50);
@@ -84,7 +82,7 @@ export async function viewAdd({ params }) {
   const go_ = () => {
     const text = pasted.trim();
     if (!text) return toast("Paste a link or a recipe first.", { emoji: "📋" });
-    const url = text.match(URL_RE)?.[0] || "";
+    const url = findLink(text);
     const rest = text.replace(url, "").trim();
     if (hasKey) return runImport({ url, text: url && rest.length <= 30 ? "" : text });
     if (url && rest.length <= 30) {
@@ -242,6 +240,7 @@ export function viewEdit({ match, params }) {
     const typedVideo = (f.videoUrl || "").trim();
     f.videoUrl = isVideoLink(typedVideo) ? cleanLink(typedVideo) : "";
     const fields = Object.fromEntries(FORM_FIELDS.map((k) => [k, f[k]]));
+    if (f.videoUrl !== (existing?.videoUrl || "")) fields.videoFound = false;
     let saved;
     if (existing) saved = await updateDish(existing.id, fields);
     else {

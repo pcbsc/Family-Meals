@@ -278,7 +278,7 @@ const MORE_STARTERS = [
     ["Toss the cucumber with the salt and let it sit for 10 minutes.", "Pour off the water and pat the cucumber dry gently.", "Add the vinegar, sugar, garlic, green onion, sesame oil and seeds. Mix.", "Grown-ups can sprinkle gochugaru on their own bowl."]),
 
   d("yubu-chobap", "Tofu Pocket Rice (Yubu Chobap)", "유부초밥", "🍱", ["lunch", "snack"], ["korean", "rice", "lunchbox", "kid-favorite", "quick"], 4, 20, 0, 0,
-    ["1 package seasoned fried tofu pockets (yubu, about 14 pockets, with its sauce and topping packets)", "3 cups cooked short-grain rice, warm", "1 tsp sesame oil", "1 tbsp toasted sesame seeds", "2 tbsp finely chopped carrot (optional)"],
+    ["1 package (about 14) seasoned fried tofu pockets (yubu), with its sauce packets", "3 cups cooked short-grain rice, warm", "1 tsp sesame oil", "1 tbsp toasted sesame seeds", "2 tbsp finely chopped carrot (optional)"],
     ["Open the package. Gently squeeze extra liquid from the tofu pockets.", "Mix the warm rice with the sauce and topping packets, sesame oil, sesame seeds and carrot.", "Wet your hands. Take a small ball of rice and gently stuff it into a pocket.", "Press the rice down so the pocket is full. Repeat!"],
     "Kids can stuff these all by themselves. Great for picnics."),
 
@@ -377,7 +377,7 @@ const MORE_STARTERS = [
 
   // ---- Trending on TikTok and Instagram, and liked by people who made them ----
   d("salmon-rice-bowl", "Salmon Rice Bowl", "", "🍣", ["lunch", "dinner"], ["seafood", "rice", "healthy", "quick", "trending"], 2, 5, 15, 0,
-    ["2 salmon fillets (about 5 oz each)", "1/2 tsp salt", "2 cups cooked short-grain rice", "2 tbsp soy sauce", "2 tbsp mayonnaise (Kewpie if you have it)", "1 tsp sriracha (optional, for grown-ups)", "1 avocado, sliced", "1 cucumber, sliced", "1 pack roasted seaweed snacks (gim)", "1 tsp toasted sesame seeds"],
+    ["2 salmon fillets (about 5 oz each)", "1/2 tsp salt", "2 cups cooked short-grain rice", "2 tbsp soy sauce", "2 tbsp mayonnaise (Kewpie if you have it)", "1 tsp sriracha (optional, for grown-ups)", "1 avocado, sliced", "1 cucumber, sliced", "1 package roasted seaweed snacks (gim)", "1 tsp toasted sesame seeds"],
     ["Heat the oven to 400°F. Sprinkle the salmon with salt and bake for 12 to 15 minutes until it flakes.", "Flake the salmon into a bowl with a fork and add the rice.", "Drizzle with soy sauce and mayo (and sriracha for grown-ups), then mix it all up.", "Top with avocado, cucumber and sesame seeds.", "Scoop bites onto seaweed squares and eat them like little tacos!"],
     "Went viral on TikTok from Emily Mariko. Good Morning America, Food52 and the Daily Dot made it and said it lives up to the hype, and it's still her most popular recipe years later. Her leftover trick: warm the rice with an ice cube on top under parchment."),
 
@@ -463,7 +463,7 @@ export const DISCOVER = [
     note: "High protein and sturdy. Parents say kids like it as a wrap or pizza." },
   { cuisine: "trending", name: "Baked Feta Pasta", nameKo: "", emoji: "🍅", by: "Grilled Cheese Social", url: "https://www.tiktok.com/@grilledcheesesocial/video/6922946148760030469", meal: "dinner",
     note: "The original TikTok pasta. The Kitchn and Time Out said it lives up to the hype." },
-  { cuisine: "trending", name: "Korean Spicy Tuna Rice", nameKo: "참치마요", emoji: "🍚", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/korean-spicy-tuna/", meal: "lunch",
+  { cuisine: "trending", name: "Korean Spicy Tuna Rice", nameKo: "", emoji: "🍚", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/korean-spicy-tuna/", meal: "lunch",
     note: "Went viral after Cardi B showed it on Instagram Live." },
 
   // ---- 🇰🇷 Korean ----

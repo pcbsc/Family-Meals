@@ -88,7 +88,7 @@ let lastCuisine = "trending";
 
 export function viewDiscover() {
   const key = (url) => String(url || "").toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[/?#]+$/, "");
-  const have = new Set(dishList().map((d) => key(d.sourceUrl)).filter(Boolean));
+  const have = new Set(dishList().flatMap((d) => [key(d.sourceUrl), key(d.videoUrl)]).filter(Boolean));
   const tabs = h("div.filters.three");
   const intro = h("p.muted");
   const list = h("div.stack");

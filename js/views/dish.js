@@ -76,8 +76,8 @@ function sourceLine(dish) {
 // ---------- Video ----------
 
 /** The player: a poster to tap, then the site's own player. autoload skips the poster. */
-function videoBox(info, name, { autoload = false } = {}) {
-  const box = h(`div.video.${info.site}${info.tall ? ".tall" : ""}`);
+function videoBox(info, name, { autoload = false, key = "" } = {}) {
+  const box = h(`div.video.${info.site}${info.tall ? ".tall" : ""}`, key ? { dataset: { key } } : {});
   const play = (fromTap) => {
     if (!navigator.onLine) return toast("Videos need the internet.", { emoji: "📶" });
     const src = new URL(info.embedUrl);
@@ -91,7 +91,8 @@ function videoBox(info, name, { autoload = false } = {}) {
       referrerpolicy: "strict-origin-when-cross-origin",
     }));
   };
-  if (autoload) play(true);
+  // Offline, the poster stays so it can be tapped once the internet is back.
+  if (autoload && navigator.onLine) play(true);
   else {
     box.append(h("button.video-poster", { type: "button", "aria-label": `Play the video on ${info.siteName}`, onclick: () => play(true) },
       info.thumbUrl ? h("img", { src: info.thumbUrl, alt: "", loading: "lazy" }) : null,
@@ -113,10 +114,10 @@ function videoCard(dish) {
   return h("section.card.video-card",
     h("div.section-head",
       h("h2", "📺 Watch how"),
-      h("button.btn.ghost.small", { onclick: () => videoSheet(dish) }, "Change"),
+      h("button.btn.ghost.small", { "aria-label": "Change the video", onclick: () => videoSheet(dish) }, "Change"),
     ),
     info.embedUrl
-      ? videoBox(info, dish.name)
+      ? videoBox(info, dish.name, { key: `${dish.id} ${info.watchUrl}` })
       : h("button.btn.soft.big.wide", { onclick: () => openVideo(info) }, `▶ Watch on ${info.siteName}`),
     h("p.muted.small.video-from", info.by ? `${info.by} on ${info.siteName} · ` : "", outside),
     // Starter recipes and videos Claude found are someone else's version of the dish.
