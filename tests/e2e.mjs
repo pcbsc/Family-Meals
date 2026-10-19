@@ -7,6 +7,8 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
+import { Buffer } from "node:buffer";
+import { STARTER_DISHES } from "../js/seed.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const TYPES = {
@@ -41,6 +43,8 @@ function sse(content, stopReason) {
     if (block.type === "tool_use" || block.type === "server_tool_use") {
       events.push({ type: "content_block_start", index, content_block: { ...block, input: {} } });
       events.push({ type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: JSON.stringify(block.input) } });
+    } else if (block.type === "web_search_tool_result") {
+      events.push({ type: "content_block_start", index, content_block: block });
     } else {
       events.push({ type: "content_block_start", index, content_block: { type: "text", text: "" } });
       events.push({ type: "content_block_delta", index, delta: { type: "text_delta", text: block.text } });
@@ -63,7 +67,15 @@ const recipe = (over = {}) => ({
   notes: "", sourceName: "Seonkyoung Longest", sourceUrl: "https://seonkyounglongest.com/tteokguk/", imageUrl: "", ...over,
 });
 
+// Stand-ins for the video sites, so the players load without the internet.
+const PIXEL = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const fakePlayer = (route) => route.fulfill({ status: 200, headers: { "content-type": "text/html" }, body: "<!doctype html><p>fake player</p>" });
+
 async function setupRoutes(context) {
+  await context.route("https://www.tiktok.com/player/**", fakePlayer);
+  await context.route("https://www.youtube-nocookie.com/**", fakePlayer);
+  await context.route("https://www.instagram.com/**/embed/", fakePlayer);
+  await context.route("https://i.ytimg.com/**", (route) => route.fulfill({ status: 200, headers: { "content-type": "image/png" }, body: PIXEL }));
   await context.route("https://api.anthropic.com/**", async (route) => {
     const req = route.request();
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS });
@@ -128,7 +140,91 @@ await check("first run sets up the family and the starter menu", async () => {
   await page.locator(".meal-cards").waitFor();
   await page.locator(".tabbar a[data-tab=menu]").click();
   await page.locator(".tile").first().waitFor();
-  assert.equal(await page.locator(".tile").count(), 38);
+  assert.equal(await page.locator(".tile").count(), STARTER_DISHES.length);
+  // The trending dishes come with their creators' videos.
+  assert.equal(await page.locator(".tile-video").count(), STARTER_DISHES.filter((d) => d.videoUrl).length);
+});
+
+await check("families on an older version get the new starter recipes, once", async () => {
+  const before = await page.evaluate(async () => {
+    const store = await import("./js/store.js");
+    const { STARTER_DISHES: all } = await import("./js/seed.js");
+    // Like a family from before: only the first batch, minus one they deleted.
+    for (const d of all.filter((x) => x.batch > 1)) await store.deleteDish(`seed-${d.seedKey}`);
+    await store.deleteDish("seed-apple-pb");
+    await store.saveSettings({ starterBatch: undefined });
+    return store.state.dishes.size;
+  });
+  await page.reload();
+  await page.locator(".toast", { hasText: "new recipes are on the menu" }).waitFor();
+  const after = await page.evaluate(async () => {
+    const { state } = await import("./js/store.js");
+    return { size: state.dishes.size, deletedBack: state.dishes.has("seed-apple-pb"), batch: state.settings.starterBatch };
+  });
+  assert.equal(after.size, before + STARTER_DISHES.filter((d) => d.batch > 1).length);
+  assert.equal(after.deletedBack, false, "a starter they deleted stays deleted");
+  assert.equal(after.batch, 2);
+  await page.reload();
+  await page.locator(".tile").first().waitFor();
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator(".toast", { hasText: "new recipes are on the menu" }).count(), 0, "only once");
+});
+
+await check("Discover has trending, Korean and American ideas, with what testers said", async () => {
+  await page.goto(BASE + "#/discover");
+  await page.getByText("Salmon Rice Bowl").waitFor();
+  await page.getByText("worth the hype").first().waitFor();
+  await page.locator(".filter", { hasText: "Korean" }).click();
+  await page.getByRole("heading", { name: "Seonkyoung Longest" }).waitFor();
+  await page.getByText("Jjajangmyeon").first().waitFor();
+  await page.locator(".filter", { hasText: "American" }).click();
+  await page.getByRole("heading", { name: "Natasha's Kitchen" }).waitFor();
+  assert.equal(await page.getByText("Salmon Rice Bowl").count(), 0);
+});
+
+await check("a trending dish plays the creator's video right in the app", async () => {
+  await page.goto(BASE + "#/dish/seed-salmon-rice-bowl");
+  await page.locator(".video-card").waitFor();
+  await page.getByText("@emilymariko on TikTok").waitFor();
+  assert.equal(await page.locator(".video-card iframe").count(), 0, "nothing loads until it's tapped");
+  await page.getByLabel("Play the video on TikTok").click();
+  assert.equal(await page.locator(".video-card iframe").getAttribute("src"),
+    "https://www.tiktok.com/player/v1/7010506729012219141?rel=0&description=1&autoplay=1");
+  // The player really loads (the page's security rules allow it).
+  await page.frameLocator(".video-card iframe").getByText("fake player").waitFor();
+});
+
+await check("cook-along keeps the video on screen while the steps change", async () => {
+  await page.getByText("Cook together").click();
+  await page.getByText("Get ready!").waitFor();
+  await page.getByLabel("Show the video").click();
+  await page.frameLocator(".cook-video iframe").getByText("fake player").waitFor();
+  await page.locator(".cook-video iframe").evaluate((el) => (el.dataset.mark = "same"));
+  await page.getByText("Let's cook ▶").click();
+  await page.getByText("Next ▶").click();
+  assert.equal(await page.locator(".cook-video iframe").getAttribute("data-mark"), "same", "the video wasn't restarted");
+  await page.getByLabel("Hide the video").click();
+  assert.equal(await page.locator(".cook-video iframe").count(), 0);
+  await page.getByLabel("Stop cooking").click();
+  await page.locator(".dish-title").waitFor();
+});
+
+await check("a grown-up can paste a video link onto any dish, and take it off", async () => {
+  await page.goto(BASE + "#/dish/seed-bulgogi");
+  await page.getByText("📺 Add a video").click();
+  await sheet().getByLabel("Video link").fill("https://seonkyounglongest.com/bulgogi/");
+  await sheet().getByText("Save this video").click();
+  await page.getByText("isn't a YouTube, TikTok or Instagram video link").waitFor();
+  await sheet().getByLabel("Video link").fill("https://youtu.be/i1djfV9uigc?si=abc");
+  await sheet().getByText("Save this video").click();
+  await page.locator(".video-card .video-poster img").waitFor();
+  assert.equal(await page.locator(".video-card .video-poster img").getAttribute("src"), "https://i.ytimg.com/vi/i1djfV9uigc/hqdefault.jpg");
+  await page.reload();
+  await page.locator(".video-card").waitFor();
+  await page.locator(".video-card").getByText("Change").click();
+  await sheet().getByText("Remove the video").click();
+  await page.getByText("📺 Add a video").waitFor();
+  assert.equal(await page.locator(".video-card").count(), 0);
 });
 
 await check("servings rescale the ingredients", async () => {
@@ -184,6 +280,34 @@ await check("Claude key is saved and tested", async () => {
 await check("settings text boxes show what's saved", async () => {
   const notes = page.getByPlaceholder("No peanuts. Kids like mild food. Dad doesn't eat mushrooms.");
   assert.equal(await notes.inputValue(), "Kids like mild (not spicy) food.");
+});
+
+await check("Claude finds a video, and only one its search really found", async () => {
+  calls.length = 0;
+  const found = {
+    type: "web_search_tool_result", tool_use_id: "srvtoolu_v",
+    content: [{ type: "web_search_result", url: "https://www.youtube.com/watch?v=i1djfV9uigc", title: "Tteokguk", encrypted_content: "x", page_age: null }],
+  };
+  reply = (body, n) => n === 1
+    ? sse([
+      { type: "server_tool_use", id: "srvtoolu_v", name: "web_search", input: { query: "tteokguk recipe video" } },
+      found,
+      { type: "tool_use", id: "toolu_v1", name: "save_video", input: { found: true, url: "https://www.youtube.com/watch?v=MadeUpVid01", channel: "Nobody", problem: "" } },
+    ], "tool_use")
+    : sse([{ type: "tool_use", id: "toolu_v2", name: "save_video", input: { found: true, url: "https://www.youtube.com/watch?v=i1djfV9uigc", channel: "Maangchi", problem: "" } }], "tool_use");
+  await page.goto(BASE + "#/dish/seed-tteokguk");
+  await page.getByText("📺 Add a video").click();
+  await sheet().getByText("Find one for me").click();
+  await page.getByText("Found one from Maangchi!").waitFor();
+  await page.locator(".video-card .video-poster").waitFor();
+  assert.equal(calls.length, 2);
+  const retry = calls[1].body.messages.at(-1).content[0];
+  assert.equal(retry.is_error, true);
+  assert.match(retry.content, /wasn't in your search results/);
+  assert.deepEqual(calls[0].body.tools.find((t) => t.name === "web_search").allowed_domains, ["youtube.com", "tiktok.com", "instagram.com"]);
+  await page.getByText("amounts may be a little different").waitFor();
+  await page.goto(BASE + "#/settings");
+  await page.getByText("Set a PIN").waitFor();
 });
 
 await check("a grown-up PIN protects settings", async () => {
@@ -262,7 +386,7 @@ await check("TikTok links shared from Android get the caption link too", async (
     req.onerror = () => reject(req.error);
     req.onsuccess = () => {
       const tx = req.result.transaction("shared", "readwrite");
-      tx.objectStore("shared").put({ id: "latest", at: Date.now(), title: "", text: "So good! https://www.tiktok.com/@cook/video/123", url: "", image: null });
+      tx.objectStore("shared").put({ id: "latest", at: Date.now(), title: "", text: "So good! https://www.tiktok.com/@cook/video/7398765432109876543", url: "", image: null });
       tx.oncomplete = () => resolve();
     };
   }));
@@ -270,8 +394,11 @@ await check("TikTok links shared from Android get the caption link too", async (
   await page.getByText("Claude had to guess").waitFor();
   const text = calls[0].body.messages[0].content.at(-1).text;
   assert.match(text, /tiktok\.com\/oembed\?url=/);
+  // The TikTok itself becomes the dish's video.
+  assert.equal(await page.getByLabel("Video link").inputValue(), "https://www.tiktok.com/@cook/video/7398765432109876543");
   await page.getByText("💾 Save").click();
   await page.locator(".dish-title", { hasText: "TikTok Egg Toast" }).waitFor();
+  await page.getByText("@cook on TikTok").waitFor();
 });
 
 await check("Claude plans the week, fixing a bad dish reference", async () => {

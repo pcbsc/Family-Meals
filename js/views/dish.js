@@ -1,17 +1,18 @@
-// Dish: the recipe card. Photos, hearts and faces, servings that rescale the
-// ingredients, and Cook-along: one big step at a time with timers.
+// Dish: the recipe card. Photos, hearts and faces, a video to watch, servings
+// that rescale the ingredients, and Cook-along: one big step at a time with timers.
 import {
   h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
-  minutesText, clearChildren,
+  minutesText, clearChildren, openSheet,
 } from "../ui.js";
 import { SPICE } from "../seed.js";
 import { scaleIngredient, parseIngredient, findTimers, cleanLink } from "../recipe.js";
 import { dateKey } from "../planner.js";
+import { videoInfo } from "../video.js";
 import {
   state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh,
 } from "../store.js";
 import {
-  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet,
+  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet,
 } from "../components.js";
 
 function notFound() {
@@ -72,6 +73,117 @@ function sourceLine(dish) {
     link ? h("a", { href: link, target: "_blank", rel: "noopener" }, dish.sourceName || new URL(link).hostname, " ↗") : dish.sourceName);
 }
 
+// ---------- Video ----------
+
+/** The player: a poster to tap, then the site's own player. autoload skips the poster. */
+function videoBox(info, name, { autoload = false } = {}) {
+  const box = h(`div.video.${info.site}${info.tall ? ".tall" : ""}`);
+  const play = (fromTap) => {
+    if (!navigator.onLine) return toast("Videos need the internet.", { emoji: "📶" });
+    const src = new URL(info.embedUrl);
+    if (fromTap && info.site !== "instagram") src.searchParams.set("autoplay", "1");
+    clearChildren(box);
+    box.append(h("iframe", {
+      src: src.href,
+      title: `${name} video on ${info.siteName}`,
+      allow: "autoplay; encrypted-media; picture-in-picture; fullscreen",
+      allowfullscreen: true,
+      referrerpolicy: "strict-origin-when-cross-origin",
+    }));
+  };
+  if (autoload) play(true);
+  else {
+    box.append(h("button.video-poster", { type: "button", "aria-label": `Play the video on ${info.siteName}`, onclick: () => play(true) },
+      info.thumbUrl ? h("img", { src: info.thumbUrl, alt: "", loading: "lazy" }) : null,
+      h("span.video-play", "▶"),
+      h("span.video-site", info.siteName),
+    ));
+  }
+  return box;
+}
+
+function openVideo(info) {
+  window.open(info.watchUrl, "_blank", "noopener");
+}
+
+function videoCard(dish) {
+  const info = videoInfo(dish.videoUrl);
+  if (!info) return null;
+  const outside = h("a", { href: info.watchUrl, target: "_blank", rel: "noopener" }, `Open in ${info.siteName} ↗`);
+  return h("section.card.video-card",
+    h("div.section-head",
+      h("h2", "📺 Watch how"),
+      h("button.btn.ghost.small", { onclick: () => videoSheet(dish) }, "Change"),
+    ),
+    info.embedUrl
+      ? videoBox(info, dish.name)
+      : h("button.btn.soft.big.wide", { onclick: () => openVideo(info) }, `▶ Watch on ${info.siteName}`),
+    h("p.muted.small.video-from", info.by ? `${info.by} on ${info.siteName} · ` : "", outside),
+    // Starter recipes and videos Claude found are someone else's version of the dish.
+    dish.seedKey || dish.videoFound ? h("p.muted.small", "The video's amounts may be a little different from this recipe.") : null,
+  );
+}
+
+let finding = false;
+
+async function findVideoFlow(dish) {
+  if (!state.settings.apiKey) return needKeySheet("Finding videos");
+  if (finding) return;
+  finding = true;
+  const progress = progressSheet("✨ Claude is looking for a video…");
+  try {
+    const { findVideo } = await import("../ai.js");
+    const result = await findVideo({
+      apiKey: state.settings.apiKey, dish, onProgress: progress.update, signal: progress.signal,
+    });
+    await progress.close();
+    if (!result.found) return toast(result.problem, { emoji: "🤷", ms: 5000 });
+    await updateDish(dish.id, { videoUrl: result.url, videoFound: true });
+    toast(result.channel ? `Found one from ${result.channel}!` : "Found a video!", { emoji: "📺", ms: 3500 });
+    refresh();
+  } catch (err) {
+    await progress.close();
+    if (err.message !== "Stopped.") toast(err.message, { emoji: "😕", ms: 6000 });
+  } finally {
+    finding = false;
+  }
+}
+
+async function videoSheet(dish) {
+  if (!(await grownUp())) return;
+  let typed = "";
+  const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${dish.name} recipe`)}`;
+  openSheet((close) => {
+    const save = async () => {
+      if (!videoInfo(typed)) return toast("That isn't a YouTube, TikTok or Instagram video link.", { emoji: "🤔", ms: 4000 });
+      await updateDish(dish.id, { videoUrl: cleanLink(typed.trim()), videoFound: false });
+      await close();
+      toast("Video added!", { emoji: "📺" });
+      refresh();
+    };
+    return h("div.stack",
+      h("button.btn.primary.big.wide", { onclick: async () => { await close(); findVideoFlow(dish); } }, "✨ Find one for me"),
+      h("a.btn.soft.wide", { href: search, target: "_blank", rel: "noopener" }, "🔎 Look on YouTube"),
+      h("p.muted.small", "Found one? In YouTube, TikTok or Instagram tap Share → Copy link, then paste it here."),
+      h("input.text", {
+        type: "url", inputmode: "url", placeholder: "Paste a video link", "aria-label": "Video link",
+        oninput: (e) => (typed = e.target.value),
+      }),
+      h("button.btn.soft.wide", { onclick: save }, "💾 Save this video"),
+      dish.videoUrl
+        ? h("button.btn.ghost.danger-text", {
+          onclick: async () => {
+            await updateDish(dish.id, { videoUrl: "", videoFound: false });
+            await close();
+            toast("Video removed.", { emoji: "🗑️" });
+            refresh();
+          },
+        }, "🗑️ Remove the video")
+        : null,
+    );
+  }, { title: dish.videoUrl ? "📺 Change the video" : "📺 Add a video" });
+}
+
 export function viewDish({ match }) {
   const dish = state.dishes.get(match[1]);
   if (!dish) return notFound();
@@ -128,6 +240,7 @@ export function viewDish({ match }) {
     ),
     familyFaces(dish),
     h("button.btn.cook.big.wide", { onclick: () => go(`#/cook/${dish.id}?s=${servings}`) }, "👩‍🍳 Cook together"),
+    videoCard(dish),
     h("section.card",
       h("div.section-head",
         h("h2", "🛒 Ingredients"),
@@ -146,6 +259,7 @@ export function viewDish({ match }) {
         : h("p.muted", "No steps yet."),
     ),
     dish.notes ? h("section.card.notes", h("h2", "💡 Tips"), h("p", dish.notes)) : null,
+    dish.videoUrl ? null : h("button.btn.ghost.center-btn", { onclick: () => videoSheet(dish) }, "📺 Add a video"),
     sourceLine(dish),
     dish.timesCooked ? h("p.muted.center", `We've cooked this ${dish.timesCooked} time${dish.timesCooked === 1 ? "" : "s"}! 🎉`) : null,
   );
@@ -204,6 +318,26 @@ export function viewCook({ match, params, setCleanup }) {
   const nextBtn = h("button.btn.primary.cook-nav.cook-next", { onclick: () => show(index + 1) }, "Next ▶");
   const readBtn = h("button.btn.soft.cook-nav", { "aria-label": "Read it to me", onclick: () => readAloud() }, "🔊");
   const gathered = new Set();
+
+  // The video sits above the steps, so you can watch and follow along at the same time.
+  const video = videoInfo(dish.videoUrl);
+  const videoPanel = h("div.cook-video");
+  videoPanel.hidden = true;
+  const videoBtn = video
+    ? h("button.icon-btn", {
+      "aria-label": "Show the video",
+      "aria-pressed": "false",
+      onclick: () => {
+        if (!video.embedUrl) return openVideo(video);
+        const on = videoPanel.hidden;
+        clearChildren(videoPanel);
+        if (on) videoPanel.append(videoBox(video, dish.name, { autoload: true }));
+        videoPanel.hidden = !on;
+        videoBtn.setAttribute("aria-pressed", String(on));
+        videoBtn.setAttribute("aria-label", on ? "Hide the video" : "Show the video");
+      },
+    }, "📺")
+    : h("span.spacer-36");
 
   const readAloud = () => {
     const text = index === 0
@@ -297,8 +431,9 @@ export function viewCook({ match, params, setCleanup }) {
     h("header.cook-top",
       h("button.icon-btn", { "aria-label": "Stop cooking", onclick: () => go(`#/dish/${dish.id}`, { replace: true }) }, "✕"),
       h("div.cook-name", dish.emoji, " ", dish.name),
-      h("span.spacer-36"),
+      videoBtn,
     ),
+    videoPanel,
     dots,
     stage,
     h("div.cook-bar", backBtn, readBtn, nextBtn),

@@ -2,7 +2,7 @@
 // welcome that sets up the family and the starter menu.
 import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti, once } from "../ui.js";
 import { dateKey } from "../planner.js";
-import { MEALS, AVATARS, STARTER_DISHES } from "../seed.js";
+import { MEALS, AVATARS, STARTER_DISHES, LATEST_STARTER_BATCH } from "../seed.js";
 import { state, saveSettings, addStarterDishes, loadAll, go, refresh, db } from "../store.js";
 import { grownUp, backHeader, stepper, chip } from "../components.js";
 
@@ -272,14 +272,17 @@ export function viewWelcome() {
     const korean = STARTER_DISHES.filter((d) => d.categories.includes("korean")).length;
     const finish = async (withStarters) => {
       const people = state.settings.members.length;
-      await saveSettings({ onboarded: true, onboardedAt: Date.now(), servings: people >= 2 ? people : state.settings.servings });
+      await saveSettings({
+        onboarded: true, onboardedAt: Date.now(), starterBatch: LATEST_STARTER_BATCH,
+        servings: people >= 2 ? people : state.settings.servings,
+      });
       if (withStarters) await addStarterDishes();
       confetti();
       go("#/today", { replace: true });
     };
     body.append(
       h("h1", "Start with some dishes?"),
-      h("p.big-text", `We have ${STARTER_DISHES.length} family recipes ready: ${korean} healthy Korean favorites (bulgogi, japchae, miyeok guk, gyeran jjim…) plus pancakes, tacos, spaghetti and more.`),
+      h("p.big-text", `We have ${STARTER_DISHES.length} family recipes ready: ${korean} healthy Korean favorites (bulgogi, japchae, tteokguk, gyeran jjim…), American family dinners like mac & cheese and chili, and trending TikTok dishes with their videos.`),
       h("button.btn.primary.big.wide", { onclick: () => finish(true) }, "✅ Yes, add them"),
       h("button.btn.ghost.wide", { onclick: () => finish(false) }, "No thanks, we'll add our own"),
     );

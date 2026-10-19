@@ -1,7 +1,7 @@
 // Family Menu: starts the app, picks the screen for the address bar's #/route,
 // and keeps the tab bar in step.
 import { h, clearChildren, toast } from "./ui.js";
-import { state, loadAll, setRedraw, saveSettings, go } from "./store.js";
+import { state, loadAll, setRedraw, saveSettings, go, addNewStarters } from "./store.js";
 import { askToKeepData } from "./db.js";
 import { viewToday } from "./views/today.js";
 import { viewWeek } from "./views/week.js";
@@ -116,7 +116,10 @@ async function start() {
   });
   if (!location.hash) history.replaceState(null, "", "#/today");
   state.navCount = 1;
+  // New starter recipes from an app update go in before the first screen draws.
+  const newStarters = await addNewStarters().catch((err) => (console.error(err), 0));
   render();
+  if (newStarters) toast(`${newStarters} new recipes are on the menu, with videos for the trending ones!`, { emoji: "🔥", ms: 5000 });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
 

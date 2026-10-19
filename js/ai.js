@@ -4,6 +4,7 @@
 import Anthropic from "../vendor/anthropic-sdk.mjs";
 import { MEALS, CATEGORIES } from "./seed.js";
 import { cleanLink } from "./recipe.js";
+import { videoInfo } from "./video.js";
 
 const MODEL = "claude-opus-5-5";
 // If Claude's safety filters ever decline a request, the API retries it on the
@@ -50,10 +51,15 @@ const RECIPE_SCHEMA = {
     sourceName: { type: "string", description: "Who created the recipe (cook, site or account), or empty." },
     sourceUrl: { type: "string", description: "The page the recipe came from, or empty." },
     imageUrl: { type: "string", description: "Direct URL of the recipe's main photo if you saw one, or empty." },
+    videoUrl: {
+      type: "string",
+      description:
+        "A video of this dish being made: the post itself if it's a video (YouTube, TikTok, an Instagram reel), or the creator's own YouTube/TikTok/Instagram video that the page embeds or links. The full link exactly as you saw it, or empty.",
+    },
   },
   required: [
     "name", "nameKo", "emoji", "description", "meals", "categories", "servings", "prepMinutes",
-    "cookMinutes", "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl",
+    "cookMinutes", "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl", "videoUrl",
   ],
   additionalProperties: false,
 };
@@ -145,11 +151,13 @@ function friendly(err) {
 
 /**
  * Runs a conversation with the web tools until Claude calls `toolName`.
- * validate(input) returns an error message to send back, or null when it's good.
+ * validate(input, seenUrls) returns an error message to send back, or null when
+ * it's good. seenUrls holds every link web_search returned along the way.
  */
 async function runUntilTool({ apiKey, system, content, tools, toolName, effort, maxTokens, validate, onProgress, signal }) {
   const api = client(apiKey);
   const messages = [{ role: "user", content }];
+  const seenUrls = new Set();
   // The refusal fallback and streamed tool input are newer API options. If the
   // API ever turns one down, ask again once without them rather than failing.
   let extras = true;
@@ -187,13 +195,18 @@ async function runUntilTool({ apiKey, system, content, tools, toolName, effort, 
         message = await send();
       }
 
+      for (const block of message.content) {
+        if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+          for (const r of block.content) if (typeof r?.url === "string") seenUrls.add(r.url);
+        }
+      }
       if (message.stop_reason === "refusal") {
         throw new FriendlyError("Claude couldn't help with this one. Try a different link or photo.");
       }
       const call = message.content.find((b) => b.type === "tool_use" && b.name === toolName);
       if (call) {
         if (message.stop_reason === "max_tokens") throw new FriendlyError("That was too long for Claude to finish. Try again.");
-        const problem = validate(call.input);
+        const problem = validate(call.input, seenUrls);
         if (!problem) return call.input;
         messages.push(
           { role: "assistant", content: message.content },
@@ -249,6 +262,8 @@ export function cleanRecipe(r) {
     sourceName: str(r.sourceName, 120),
     sourceUrl: cleanLink(str(r.sourceUrl)),
     imageUrl: /^https:\/\//.test(str(r.imageUrl)) ? str(r.imageUrl) : "",
+    // Only links the app can actually play or open as a video.
+    videoUrl: videoInfo(str(r.videoUrl)) ? cleanLink(str(r.videoUrl)) : "",
   };
   if (!recipe.meals.length) recipe.meals = ["dinner"];
   if (!recipe.name || !recipe.ingredients.length || !recipe.steps.length) return null;
@@ -266,6 +281,7 @@ How to work:
 - Keep the original amounts and units. Don't invent ingredients the recipe doesn't use.
 - Write the steps in your own words, short and simple, one action each, so a 7-year-old helper can follow along with a grown-up.
 - Fill in the Korean name in Hangul for Korean dishes.
+- Set videoUrl so the family can watch while they cook: the post itself if it's a video, otherwise the creator's own video of this recipe if the page embeds or links one. Only use a link you actually saw; never make one up.
 - If there's truly nothing recipe-like (for example a private or deleted post), call save_recipe with found=false, a short friendly problem, and empty placeholders in the recipe.
 
 Finish by calling save_recipe exactly once.`;
@@ -308,6 +324,8 @@ export async function importRecipe({ apiKey, url, text, image, onProgress, signa
   }
   const recipe = cleanRecipe(result.recipe);
   if (!recipe.sourceUrl && url) recipe.sourceUrl = url;
+  // A recipe shared from a video post keeps the video.
+  if (!recipe.videoUrl && url && videoInfo(url)) recipe.videoUrl = cleanLink(url);
   return { found: true, problem: "", confidence: result.confidence || "adapted", recipe };
 }
 
@@ -321,7 +339,7 @@ Plan meals the family will enjoy and that are good for growing kids:
 - For a Korean-style dinner you may add one or two side dishes (banchan or a soup) from the menu after the main dish, like a real Korean table with rice.
 - Breakfasts are quick on weekdays (15 minutes or less) and can be special on weekends. Repeating a breakfast or snack is fine.
 - Keep it mild for the kids unless the notes say otherwise. If you include a spicy dish, say how to make it milder in "why".
-- New ideas: add the requested number of new dishes that aren't on the menu yet. Find real recipes with web_search and read them with web_fetch. For Korean dishes prefer Seonkyoung Longest (seonkyounglongest.com), then Korean Bapsang, Maangchi or My Korean Kitchen; for other cuisines use well-known family-friendly recipe sites. Set sourceName and sourceUrl, keep the recipe's amounts, and write the steps in your own words, short and clear enough for a 7-year-old helper. Refer to each new dish in slots as "new:<key>".
+- New ideas: add the requested number of new dishes that aren't on the menu yet. Find real recipes with web_search and read them with web_fetch. For Korean dishes prefer Seonkyoung Longest (seonkyounglongest.com), then Korean Bapsang, Maangchi or My Korean Kitchen; for other cuisines use well-known family-friendly recipe sites. Set sourceName and sourceUrl (and videoUrl if the page has the creator's video of it), keep the recipe's amounts, and write the steps in your own words, short and clear enough for a 7-year-old helper. Refer to each new dish in slots as "new:<key>".
 - Only fill the slots you're asked to fill.
 
 Finish by calling save_week_plan exactly once.`;
@@ -373,6 +391,68 @@ export async function planWeek({ apiKey, request, menuIds, onProgress, signal })
     }))
     .filter((s) => s.dishes.length);
   return { summary: str(result.summary), slots, newDishes };
+}
+
+const SAVE_VIDEO_TOOL = {
+  name: "save_video",
+  description: "Save the video you picked. Call this exactly once, at the end.",
+  input_schema: {
+    type: "object",
+    properties: {
+      found: { type: "boolean", description: "False if you couldn't find a good video." },
+      url: { type: "string", description: "The video's full link, exactly as it appeared in the search results. Empty if found is false." },
+      channel: { type: "string", description: "Who made it (channel or account name), or empty." },
+      problem: { type: "string", description: "If found is false: a short, friendly reason. Otherwise empty." },
+    },
+    required: ["found", "url", "channel", "problem"],
+    additionalProperties: false,
+  },
+};
+
+const VIDEO_SYSTEM = `You find one cooking video for a dish in a family's recipe app, so the family (including young kids) can watch how it's made while they cook.
+
+- Use web_search to look for videos of this dish. Prefer YouTube; TikTok or an Instagram reel is fine.
+- Pick a video that clearly shows how to make this dish, is kid-appropriate, and matches the recipe's style (for example, not a much spicier version). Prefer well-known cooks: for Korean food Seonkyoung Longest, Maangchi, Aaron and Claire, Korean Bapsang or My Korean Kitchen; for other food, trusted family cooks and recipe channels.
+- Only use a link that appeared in your search results. Never make up or guess a video link.
+- Finish by calling save_video exactly once.`;
+
+/** Finds a video for a dish. Returns { found, url, channel, problem }. */
+export async function findVideo({ apiKey, dish, onProgress, signal }) {
+  const about = [
+    `Dish: ${dish.name}${dish.nameKo ? ` (${dish.nameKo})` : ""}`,
+    dish.description ? `About it: ${dish.description}` : "",
+    dish.sourceName ? `The recipe is from: ${dish.sourceName}` : "",
+    `Ingredients: ${(dish.ingredients || []).slice(0, 15).join("; ")}`,
+  ].filter(Boolean).join("\n");
+  const result = await runUntilTool({
+    apiKey,
+    system: VIDEO_SYSTEM,
+    content: [{ type: "text", text: `${about}\n\nFind one good video of how to make this.` }],
+    tools: [
+      { type: "web_search_20260209", name: "web_search", max_uses: 3, allowed_domains: ["youtube.com", "tiktok.com", "instagram.com"] },
+      SAVE_VIDEO_TOOL,
+    ],
+    toolName: "save_video",
+    effort: "low",
+    maxTokens: 8000,
+    onProgress,
+    signal,
+    validate: (input, seenUrls) => {
+      if (input?.found === false) return null;
+      const info = videoInfo(str(input?.url));
+      if (!info) return "That link isn't a YouTube, TikTok or Instagram video. Use a video link from your search results.";
+      // A made-up link would play the wrong video (or nothing), so it has to be one the search really found.
+      const seen = [...seenUrls].some((u) => {
+        const other = videoInfo(u);
+        return other && other.site === info.site && (info.id ? other.id === info.id : other.watchUrl === info.watchUrl);
+      });
+      return seen ? null : "That video wasn't in your search results. Search, then pick a video link from the results.";
+    },
+  });
+  if (result.found === false) {
+    return { found: false, url: "", channel: "", problem: str(result.problem, 200) || "Claude couldn't find a good video for this one." };
+  }
+  return { found: true, url: cleanLink(str(result.url)), channel: str(result.channel, 80), problem: "" };
 }
 
 /** Cheap check that a key works (lists the model; no tokens used). */

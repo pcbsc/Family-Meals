@@ -1,7 +1,7 @@
 // The app's data in memory, plus the functions that change it. Every change is
 // written to IndexedDB straight away, then the current screen redraws.
 import * as db from "./db.js";
-import { MEALS, STARTER_DISHES } from "./seed.js";
+import { MEALS, STARTER_DISHES, LATEST_STARTER_BATCH, startersToAdd } from "./seed.js";
 import { dateKey, addDays, slotId, averageRating } from "./planner.js";
 
 export const DEFAULT_SETTINGS = {
@@ -91,7 +91,7 @@ export function blankDish() {
   return {
     name: "", nameKo: "", emoji: "🍽️", description: "", meals: ["dinner"], categories: [],
     servings: state.settings.servings || 4, prepMinutes: 0, cookMinutes: 0, spicy: 0,
-    ingredients: [], steps: [], notes: "", sourceName: "", sourceUrl: "", imageUrl: "",
+    ingredients: [], steps: [], notes: "", sourceName: "", sourceUrl: "", imageUrl: "", videoUrl: "",
   };
 }
 
@@ -131,14 +131,27 @@ export async function deleteDish(id) {
   for (const w of state.wishes.filter((w) => w.dishId === id)) await removeWish(w.id);
 }
 
-export async function addStarterDishes() {
+export async function addStarterDishes(list = STARTER_DISHES) {
   const have = new Set(dishList().map((d) => d.seedKey).filter(Boolean));
   let added = 0;
-  for (const seed of STARTER_DISHES) {
+  for (const { batch, ...seed } of list) {
     if (have.has(seed.seedKey)) continue;
-    await saveDish({ ...seed, id: `seed-${seed.seedKey}`, description: "", sourceName: "", sourceUrl: "", imageUrl: "" });
+    await saveDish({ description: "", sourceName: "", sourceUrl: "", imageUrl: "", videoUrl: "", ...seed, id: `seed-${seed.seedKey}` });
     added++;
   }
+  return added;
+}
+
+/**
+ * When the app gains new starter recipes, a family using the starter menu gets
+ * them once. Returns how many were added. Starters they deleted stay deleted.
+ */
+export async function addNewStarters() {
+  const s = state.settings;
+  if (!s.onboarded || (s.starterBatch ?? 0) >= LATEST_STARTER_BATCH) return 0;
+  const haveSeedKeys = new Set(dishList().map((d) => d.seedKey).filter(Boolean));
+  const added = await addStarterDishes(startersToAdd({ starterBatch: s.starterBatch, haveSeedKeys }));
+  await saveSettings({ starterBatch: LATEST_STARTER_BATCH });
   return added;
 }
 

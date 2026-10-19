@@ -17,11 +17,16 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
   Asian-market aisle). Tick things off, or send the list to a phone.
 - **Add a dish**: paste a link (recipe sites, Instagram, TikTok, YouTube), snap a photo
   of a cookbook page or a screenshot, paste a caption, or write our own.
+- **📺 Videos**: a dish can have a YouTube, TikTok or Instagram video. It plays right on the
+  dish page, and in **Cook together** the 📺 button keeps it above the steps while you cook.
 - **🙋 I want to eat…**: kids make wishes, and the grown-ups see them when planning.
 
-It starts with 38 family recipes: 24 healthy Korean home dishes (bulgogi, japchae,
-miyeok guk, gyeran jjim, namul, kimbap…) and everyday favorites like pancakes, tacos,
-spaghetti and salmon.
+It starts with 79 family recipes: 42 healthy Korean home dishes (bulgogi, japchae,
+tteokguk, miyeok guk, gyeran jjim, jjajangmyeon, namul, kimbap…), American family dinners
+(turkey chili, mac & cheese, sheet-pan fajitas, fish sticks, banana oat muffins…), and 7
+dishes that went viral on TikTok and Instagram and that home cooks tested and liked, each
+with the creator's video. If you already use the app, the new recipes appear on their own
+the next time it opens (dishes you deleted stay deleted).
 
 ---
 
@@ -60,13 +65,15 @@ cards, and plans the week. It needs a key from an Anthropic account:
 4. In Family Menu tap **⚙️** (top right of Today) → paste the key under
    **✨ Claude** → **Save & test**.
 
-**Cost:** about 10–15¢ to import a recipe, and 25–40¢ to plan a week that includes new
-dishes from the web. "Use our favorites" and everything else are free and work offline.
+**Cost:** about 10–15¢ to import a recipe, a few cents to find a video, and 25–40¢ to plan
+a week that includes new dishes from the web. "Use our favorites" and everything else are
+free and work offline (videos need the internet).
 
 The key is saved only on this device. It isn't put in backup files, and it's only ever
 sent to Claude.
 
-**What Claude sees:** the link, caption or photo you import. When planning a week: your
+**What Claude sees:** the link, caption or photo you import. When finding a video: the
+dish's name, description and ingredients. When planning a week: your
 dish names and ratings, the food notes in Settings, and the family's first names (so the
 plan can say who asked for what). Nothing else leaves the device.
 
@@ -83,6 +90,22 @@ If the recipe only exists in the video, Claude rebuilds it from the caption and 
 it had to guess, so check the amounts. If a post is private, copy its caption or take a
 screenshot and share or paste that instead. Screenshots can be shared straight to
 Family Menu too.
+
+## Videos
+
+- **Recipes from a video** (a TikTok, Instagram reel or YouTube link) keep that video
+  automatically. Recipes from a website keep the creator's video when the page has one.
+- **Any other dish:** open it and tap **📺 Add a video** (at the bottom). Then either
+  **✨ Find one for me** (Claude searches YouTube, TikTok and Instagram and picks a good one
+  from a well-known cook), or **🔎 Look on YouTube**, tap **Share → Copy link** on the video
+  you like, come back and paste it. You can also paste a link into **Video link** in Edit.
+- **While cooking:** in **Cook together**, tap **📺** at the top. The video stays above the
+  steps while you swipe through them; tap 📺 again to hide it.
+- To change or remove a video, tap **Change** next to it.
+
+Nothing is loaded from the video site until you tap ▶, and videos need the internet. A
+short TikTok share link (vm.tiktok.com/…) opens in TikTok instead of playing in the app.
+For a starter recipe, the video is the creator's version, so their amounts may differ a little.
 
 ## Grown-up PIN
 
@@ -102,7 +125,16 @@ monthly.
 ## About the recipes
 
 The starter recipes are home-style versions written for this app. The **✨ Ideas from famous cooks**
-list (Menu → ➕ Add) links to recipes by Seonkyoung Longest, Korean Bapsang and Maangchi.
+list (Menu → ➕ Add) has three tabs:
+
+- **🔥 Trending**: dishes that went viral on TikTok and Instagram, each with a one-line note
+  on what people who made them said. The notes come from published taste tests and
+  reviews (Good Morning America, The Kitchn, Food52, Time Out, food bloggers), not from
+  reading the comments on the posts themselves.
+- **🇰🇷 Korean**: Seonkyoung Longest, Korean Bapsang, Maangchi and My Korean Kitchen.
+- **🇺🇸 American**: Natasha's Kitchen, Once Upon a Chef, Budget Bytes, Sally's Baking
+  Addiction and Super Healthy Kids.
+
 When you tap **Add**, Claude reads that page and saves a copy on your device for your
 family to cook from, with a link back to the creator. Please visit their sites; their
 videos are wonderful to watch together.
@@ -122,8 +154,9 @@ A static web app with no build step. Open `index.html` through any web server.
 | `js/components.js`, `js/ui.js` | Shared pieces: tiles, sheets, PIN pad, photos |
 | `js/recipe.js` | Ingredient parsing, servings scaling, shopping list, timers |
 | `js/planner.js` | Dates and the no-AI "Use our favorites" |
-| `js/ai.js` | Claude: recipe import and week planning |
-| `js/seed.js` | Starter recipes and the "Ideas from famous cooks" list |
+| `js/ai.js` | Claude: recipe import, finding videos and week planning |
+| `js/video.js` | Turns YouTube / TikTok / Instagram / Vimeo links into players |
+| `js/seed.js` | Starter recipes (in batches) and the "Ideas from famous cooks" list |
 | `sw.js`, `manifest.webmanifest` | Offline support and the Android share target |
 | `vendor/` | The official Anthropic SDK bundled as one module |
 
@@ -145,3 +178,10 @@ structured result. They also handle `pause_turn`, retry when the result is incom
 and opt into server-side fallbacks (`fallbacks: "default"`) in case a request is
 declined. If you add a file the app needs offline, list it in `APP_FILES` in `sw.js`
 and bump `VERSION`.
+
+Video players can only come from the sites in `PLAYER_ORIGINS` (`js/video.js`), which must
+match `frame-src` in the page's Content-Security-Policy (a unit test checks). Player links are
+rebuilt from the parsed video id, never copied from what was pasted. Claude's "find a video"
+answer is only accepted if that video was in its web-search results. To add starter recipes,
+add them to a new batch in `js/seed.js` and raise `LATEST_STARTER_BATCH`; families who
+use the starter menu get the new batch once.

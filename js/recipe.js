@@ -163,11 +163,19 @@ function singular(word) {
 }
 
 /** "2 large Yellow Onions (about 1 lb), diced" → "yellow onion" */
+// Words that describe a food rather than name one, for "X or Y food" lines.
+const DESCRIBING = new Set(("soft medium firm silken plain vanilla greek fresh frozen dried canned low-sodium korean persian " +
+  "english japanese red green yellow white brown sweet unsalted salted whole light dark pizza marinara tomato regular " +
+  "large small baby thin thick boneless skinless").split(" "));
+
 export function normalizeItemName(item) {
   let s = String(item || "").toLowerCase();
   s = s.replace(/\([^)]*\)/g, " ").split(/,| - | – |;/)[0];
   s = s.replace(/\b(for (garnish|serving|topping|drizzling)|to taste|or more|as needed|if you like|plus more.*)$/g, " ");
-  s = s.replace(/\bor\b.*$/, " ");
+  // "soft or medium tofu" is soft tofu, but "beef or pork" is beef.
+  const either = s.match(/^\s*([a-z-]+) or (.+)$/);
+  if (either && DESCRIBING.has(either[1])) s = [either[1], ...either[2].trim().split(/\s+/).slice(1)].join(" ");
+  else s = s.replace(/\bor\b.*$/, " ");
   for (const [re, name] of SYNONYMS) if (re.test(s)) return name;
   const words = s.replace(/[^a-z0-9가-힣\s-]/g, " ").split(/\s+/).filter((w) => w && !DROP_WORDS.has(w));
   if (!words.length) return s.trim();
@@ -189,13 +197,13 @@ export const AISLES = [
 const AISLE_WORDS = [
   ["frozen", /\bfrozen\b/],
   // Checked before the meat and produce words they contain ("chicken broth", "garlic powder").
-  ["pantry", /broth|\bstock\b|powder|peanut butter|sunflower butter|almond butter|\bdried (thyme|oregano|basil|parsley|rosemary|dill|herbs?)\b|bay lea|canned|marinara|tomato sauce|tomato paste|crushed tomato/],
-  ["asian", /tofu|kimchi|gochujang|doenjang|gochugaru|fish sauce|mirin|rice wine|rice cake|tteok|dangmyeon|glass noodle|sweet potato noodle|seaweed|\bgim\b|miyeok|nori|dashima|kelp|anchov|soup soy|oyster sauce|perilla|danmuji|pickled radish|eomuk|fish cake|sesame oil|korean radish|rice vinegar|plum extract|corn syrup|oligo|jjajang|udon/],
-  ["meat", /beef|pork|chicken|turkey|ribeye|sirloin|short rib|brisket|bacon|sausage|\bham\b|pepperoni|salami|salmon|mackerel|\bfish\b|\bcod\b|shrimp|prawn|squid|clam|mussel|steak|lamb|drumstick|imitation crab/],
+  ["pantry", /broth|\bstock\b|powder|peanut butter|sunflower butter|almond butter|\bdried (italian )?(thyme|oregano|basil|parsley|rosemary|dill|herbs?)\b|italian (herbs?|seasoning)|bay lea|canned|marinara|pizza sauce|tomato sauce|tomato paste|crushed tomato|sun-dried|starch|worcestershire/],
+  ["asian", /tofu|kimchi|gochujang|doenjang|gochugaru|fish sauce|mirin|rice wine|rice cake|tteok|dangmyeon|glass noodle|sweet potato noodle|seaweed|\bgim\b|miyeok|nori|dashima|kelp|anchov|soup soy|oyster sauce|perilla|danmuji|pickled radish|eomuk|fish cake|sesame oil|korean radish|rice vinegar|plum extract|corn syrup|oligo|jjajang|udon|black bean paste|chunjang|jujube|ginseng|chili crisp|chili oil|rice paper|dumpling wrapper|wonton wrapper|yubu|tofu pocket/],
+  ["meat", /beef|pork|chicken|turkey|ribeye|sirloin|short rib|brisket|bacon|sausage|\bham\b|pepperoni|salami|salmon|mackerel|\bfish\b|\bcod\b|shrimp|prawn|squid|clam|mussel|steak|lamb|drumstick|imitation crab|\bhens?\b/],
   ["grains", /\brice\b|noodle|pasta|spaghetti|macaroni|bread|tortilla|\bflour\b|oats|oatmeal|flatbread|pita|naan|pizza dough|cereal|granola|\bbuns?\b|bagel|cracker/],
-  ["dairy", /\beggs?\b|milk|butter|cheese|yogurt|yoghurt|cream|mozzarella|parmesan|cheddar|hummus/],
-  ["produce", /onion|garlic|ginger|carrot|spinach|zucchini|squash|potato|cabbage|lettuce|cucumber|tomato|pepper(?!corn)|jalape|\bchil(?:i|e)s?\b|mushroom|sprout|radish|apple|banana|berr|lemon|lime|orange|avocado|cilantro|parsley|basil|broccoli|celery|pear|fruit|kale|corn|peas|chive|herb|grape|melon|mango|peach|kiwi|eggplant|asparagus|green bean|bok choy|napa|leek|shallot|scallion|thyme|rosemary|mint|dill/],
-  ["pantry", /\boil\b|sugar|\bsalt\b|soy sauce|vinegar|honey|sesame seed|spice|cumin|paprika|oregano|cinnamon|vanilla|syrup|ketchup|mustard|mayo|cornstarch|starch|bouillon|salsa|beans|tuna|nut|raisin|chocolate|jam|seasoning|baking/],
+  ["dairy", /\beggs?\b|milk|half-and-half|butter|cheese|yogurt|yoghurt|cream|mozzarella|parmesan|cheddar|hummus/],
+  ["produce", /onion|garlic|ginger|carrot|spinach|zucchini|squash|potato|cabbage|lettuce|cucumber|tomato|pepper(?!corn)|jalape|\bchil(?:i|e)s?\b|mushroom|sprout|radish|apple|banana|berr|lemon|lime|orange|avocado|cilantro|parsley|basil|broccoli|celery|pear|fruit|kale|corn|\bpeas?\b|chive|herb|grape|melon|mango|peach|kiwi|eggplant|asparagus|green bean|bok choy|napa|leek|shallot|scallion|thyme|rosemary|mint|dill/],
+  ["pantry", /\boil\b|sugar|\bsalt\b|soy sauce|vinegar|honey|sesame seed|spice|cumin|paprika|oregano|cinnamon|vanilla|syrup|ketchup|mustard|mayo|cornstarch|starch|bouillon|salsa|beans|tuna|nut|raisin|chocolate|jam|seasoning|baking|\bbeans?\b|almond|yeast|sriracha/],
 ];
 
 /** Things most kitchens already have; the list shows them apart so nobody buys a fifth bottle of soy sauce. */

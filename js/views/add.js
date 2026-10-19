@@ -3,6 +3,7 @@
 import { h, toast, openSheet, confirmSheet, preparePhoto, pickImage, imageForClaude, clearChildren, once } from "../ui.js";
 import { MEALS, CATEGORIES, SPICE } from "../seed.js";
 import { parseRecipeText, stripStepNumber, cleanLink } from "../recipe.js";
+import { isVideoLink } from "../video.js";
 import { state, blankDish, saveDish, updateDish, deleteDish, addPhoto, go, redrawScreen, db } from "../store.js";
 import { backHeader, stepper, chip, progressSheet, needKeySheet, dishArt } from "../components.js";
 
@@ -86,9 +87,15 @@ export async function viewAdd({ params }) {
     const url = text.match(URL_RE)?.[0] || "";
     const rest = text.replace(url, "").trim();
     if (hasKey) return runImport({ url, text: url && rest.length <= 30 ? "" : text });
-    if (url && rest.length <= 30) return needKeySheet("Reading links");
+    if (url && rest.length <= 30) {
+      if (!isVideoLink(url)) return needKeySheet("Reading links");
+      // Without Claude a video link can't become a recipe, but it can still be the dish's video.
+      state.draft = { ...blankDish(), sourceUrl: url, videoUrl: cleanLink(url), confidence: "video" };
+      return go("#/new?draft=1");
+    }
     const r = parseRecipeText(text);
-    state.draft = { ...blankDish(), ...r, servings: r.servings || state.settings.servings, sourceUrl: url };
+    state.draft = { ...blankDish(), ...r, servings: r.servings || state.settings.servings, sourceUrl: url, confidence: "sorted" };
+    if (isVideoLink(url)) state.draft.videoUrl = cleanLink(url);
     go("#/new?draft=1");
   };
 
@@ -126,8 +133,20 @@ function minutes(n) {
 // heart added while the form was open isn't overwritten.
 const FORM_FIELDS = [
   "name", "nameKo", "emoji", "description", "meals", "categories", "servings", "prepMinutes", "cookMinutes",
-  "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl",
+  "spicy", "ingredients", "steps", "notes", "sourceName", "sourceUrl", "imageUrl", "videoUrl",
 ];
+
+const DRAFT_BANNERS = {
+  guessed: ["🤔", "Claude had to guess some of this", "There wasn't a written recipe, so check the amounts before cooking."],
+  sorted: ["📋", "We sorted your recipe", "Check the ingredients and steps, then Save."],
+  video: ["📺", "The video is attached", "Give the dish a name, add the ingredients and steps if you like, then Save."],
+  claude: ["✨", "Claude filled this in", "Have a quick look, add a photo if you like, then Save."],
+};
+
+function draftBanner(confidence) {
+  const [emoji, title, text] = DRAFT_BANNERS[confidence] || DRAFT_BANNERS.claude;
+  return h("section.card.banner", h("span.banner-emoji", emoji), h("div.grow", h("strong", title), h("p.muted", text)));
+}
 
 // What someone was typing, kept if they tap away before saving (until the app closes).
 const unsaved = new Map();
@@ -220,6 +239,8 @@ export function viewEdit({ match, params }) {
     f.cookMinutes = minutes(f.cookMinutes);
     const typedLink = (f.sourceUrl || "").trim();
     f.sourceUrl = cleanLink(typedLink);
+    const typedVideo = (f.videoUrl || "").trim();
+    f.videoUrl = isVideoLink(typedVideo) ? cleanLink(typedVideo) : "";
     const fields = Object.fromEntries(FORM_FIELDS.map((k) => [k, f[k]]));
     let saved;
     if (existing) saved = await updateDish(existing.id, fields);
@@ -229,7 +250,8 @@ export function viewEdit({ match, params }) {
     }
     unsaved.delete(formKey);
     state.draft = null;
-    const linkNote = typedLink && !f.sourceUrl ? " (The link didn't look like a web address, so it was left out.)" : "";
+    const linkNote = (typedLink && !f.sourceUrl ? " (The link didn't look like a web address, so it was left out.)" : "")
+      + (typedVideo && !f.videoUrl ? " (The video link wasn't YouTube, TikTok or Instagram, so it was left out.)" : "");
     toast((existing ? "Saved!" : `${saved.name} is on our menu!`) + linkNote, { emoji: existing ? "💾" : "🎉", ms: linkNote ? 5000 : 2600 });
     go(`#/dish/${saved.id}`, { replace: true });
   });
@@ -243,17 +265,7 @@ export function viewEdit({ match, params }) {
         h("button.btn.soft", { onclick: () => { unsaved.delete(formKey); redrawScreen(); } }, "Start over"),
       )
       : null,
-    !kept && draft
-      ? h("section.card.banner",
-        h("span.banner-emoji", draft.confidence === "guessed" ? "🤔" : "✨"),
-        h("div.grow",
-          h("strong", draft.confidence === "guessed" ? "Claude had to guess some of this" : "Claude filled this in"),
-          h("p.muted", draft.confidence === "guessed"
-            ? "There wasn't a written recipe, so check the amounts before cooking."
-            : "Have a quick look, add a photo if you like, then Save."),
-        ),
-      )
-      : null,
+    !kept && draft ? draftBanner(draft.confidence) : null,
     h("section.card.form",
       h("div.form-top",
         existing ? dishArt(existing, { className: "art-sm" }) : null,
@@ -279,6 +291,7 @@ export function viewEdit({ match, params }) {
           field("Tips", area("notes", 3, { placeholder: "Kids like it with extra sesame seeds." })),
           field("Recipe from", text("sourceName", { placeholder: "Seonkyoung Longest, Grandma…" })),
           field("Link", text("sourceUrl", { type: "url", placeholder: "https://…" })),
+          field("Video link", text("videoUrl", { type: "url", placeholder: "https://youtube.com/…" }), "YouTube, TikTok or Instagram. Watch it on the dish page and while cooking."),
         ),
       ),
     ),

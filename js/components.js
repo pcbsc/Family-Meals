@@ -45,6 +45,7 @@ export function dishTile(dish, { onclick, selected = false, small = false } = {}
   return h(`button.tile${small ? ".small" : ""}${selected ? ".selected" : ""}`, { type: "button", onclick },
     dishArt(dish),
     isFavorite(dish) ? h("span.tile-heart", { "aria-label": "Family favorite" }, "❤️") : null,
+    dish.videoUrl && !small ? h("span.tile-video", { "aria-label": "Has a video" }, "▶") : null,
     selected ? h("span.tile-check", "✓") : null,
     h("span.tile-name", dish.name),
     dish.nameKo ? h("span.tile-ko", dish.nameKo) : null,

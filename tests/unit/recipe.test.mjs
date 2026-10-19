@@ -174,3 +174,23 @@ test("links are made safe to open", async () => {
   assert.equal(cleanLink("Grandma's kitchen"), "");
   assert.equal(cleanLink(""), "");
 });
+
+test("'X or Y food' lines keep the food's name", () => {
+  assert.equal(normalizeItemName("soft or medium tofu, cubed"), "soft tofu");
+  assert.equal(normalizeItemName("plain or vanilla yogurt"), "yogurt");
+  assert.equal(normalizeItemName("pizza or marinara sauce"), "pizza sauce");
+  assert.equal(normalizeItemName("beef or pork"), "beef");
+  assert.equal(normalizeItemName("water or chicken broth"), "water");
+  assert.equal(normalizeItemName("spaghetti or thick rice noodles"), "spaghetti");
+});
+
+test("new starter ingredients land in the right aisle", () => {
+  const cases = {
+    "korean black bean paste": "asian", "dried jujube": "asian", "chili crisp": "asian", "round rice paper": "asian",
+    "round dumpling wrapper": "asian", "cornish hen": "meat", "cornstarch": "pantry", "potato starch": "pantry",
+    "worcestershire sauce": "pantry", "panko breadcrumbs": "grains", "half-and-half": "dairy", "kidney bean": "pantry",
+    "instant yeast": "pantry", "sun-dried tomato": "pantry", "dried italian herb": "pantry", "snap pea": "produce",
+    "peanut": "pantry", "pizza sauce": "pantry",
+  };
+  for (const [item, aisle] of Object.entries(cases)) assert.equal(aisleFor(item), aisle, item);
+});

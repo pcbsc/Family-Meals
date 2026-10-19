@@ -79,38 +79,68 @@ export function viewMenu({ params }) {
   );
 }
 
+const CUISINES = [
+  { key: "trending", emoji: "🔥", label: "Trending", intro: "Viral on TikTok and Instagram, and liked by the people who made them at home." },
+  { key: "korean", emoji: "🇰🇷", label: "Korean", intro: "Healthy family Korean food from famous home cooks." },
+  { key: "american", emoji: "🇺🇸", label: "American", intro: "Family dinners, muffins and snacks from trusted recipe sites." },
+];
+let lastCuisine = "trending";
+
 export function viewDiscover() {
   const key = (url) => String(url || "").toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[/?#]+$/, "");
   const have = new Set(dishList().map((d) => key(d.sourceUrl)).filter(Boolean));
-  const groups = new Map();
-  for (const r of DISCOVER) {
-    if (!groups.has(r.by)) groups.set(r.by, []);
-    groups.get(r.by).push(r);
-  }
+  const tabs = h("div.filters.three");
+  const intro = h("p.muted");
+  const list = h("div.stack");
+
+  const item = (r) => h("div.discover-item",
+    h("span.discover-emoji", r.emoji),
+    h("div.grow",
+      h("strong", r.name),
+      r.nameKo ? h("span.muted.block", r.nameKo) : null,
+    ),
+    h("a.btn.ghost.small", { href: r.url, target: "_blank", rel: "noopener" }, "Look ↗"),
+    have.has(key(r.url))
+      ? h("span.added", "✓ In menu")
+      : h("button.btn.primary.small", {
+        onclick: () => {
+          if (!state.settings.apiKey) return needKeySheet("Adding recipes from the web");
+          runImport({ url: r.url }).catch((e) => toast(e.message, { emoji: "😕" }));
+        },
+      }, "➕ Add"),
+    r.note ? h("p.discover-note", "💬 ", r.note) : null,
+  );
+
+  const draw = () => {
+    clearChildren(tabs);
+    for (const c of CUISINES) {
+      tabs.append(h(`button.filter${lastCuisine === c.key ? ".on" : ""}`, {
+        "aria-pressed": lastCuisine === c.key ? "true" : "false",
+        onclick: () => { lastCuisine = c.key; draw(); },
+      }, h("span.filter-emoji", c.emoji), c.label));
+    }
+    intro.textContent = CUISINES.find((c) => c.key === lastCuisine).intro;
+    clearChildren(list);
+    const groups = new Map();
+    for (const r of DISCOVER.filter((d) => d.cuisine === lastCuisine)) {
+      if (!groups.has(r.by)) groups.set(r.by, []);
+      groups.get(r.by).push(r);
+    }
+    // Trending recipes each come from a different creator, so they're one list.
+    if (lastCuisine === "trending") list.append(h("div.discover-list", [...groups.values()].flat().map(item)));
+    else {
+      for (const [by, recipes] of groups) {
+        list.append(h("section.discover-group", h("h2", by), h("div.discover-list", recipes.map(item))));
+      }
+    }
+  };
+  draw();
+
   return h("div.screen.discover",
     backHeader("✨ Ideas from famous cooks", { back: "#/add" }),
-    h("p.muted", "Famous home cooks with healthy family Korean food. Tap Add and Claude reads the recipe and puts it in our menu. You can also ask Claude to find new dishes when it plans your week."),
-    ...[...groups.entries()].map(([by, recipes]) =>
-      h("section.discover-group",
-        h("h2", by),
-        h("div.discover-list", recipes.map((r) => {
-          const added = have.has(key(r.url));
-          return h("div.discover-item",
-            h("span.discover-emoji", r.emoji),
-            h("div.grow", h("strong", r.name), r.nameKo ? h("span.muted.block", r.nameKo) : null),
-            h("a.btn.ghost.small", { href: r.url, target: "_blank", rel: "noopener" }, "Look ↗"),
-            added
-              ? h("span.added", "✓ In menu")
-              : h("button.btn.primary.small", {
-                onclick: () => {
-                  if (!state.settings.apiKey) return needKeySheet("Adding recipes from the web");
-                  runImport({ url: r.url }).catch((e) => toast(e.message, { emoji: "😕" }));
-                },
-              }, "➕ Add"),
-          );
-        })),
-      ),
-    ),
-    h("p.muted.small.center", "Recipes belong to their creators. Visit their sites to see the full posts, photos and videos."),
+    tabs,
+    intro,
+    list,
+    h("p.muted.small.center", "Tap Add and Claude reads the recipe (and keeps the video if there is one). Recipes belong to their creators; visit their sites and videos."),
   );
 }
