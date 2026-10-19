@@ -2,7 +2,7 @@
 // Run with `npm run e2e`. Exits non-zero on the first failure.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
@@ -91,18 +91,18 @@ page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && !/Failed to load resource/.test(m.text()) && errors.push(m.text()));
 
 let step = 0;
+const failed = [];
+// Records a failure (with a screenshot) and carries on, so one run shows every problem.
 async function check(name, fn) {
   step++;
   try {
     await fn();
     console.log(`ok ${step} - ${name}`);
   } catch (err) {
-    console.log(`not ok ${step} - ${name}`);
+    console.log(`not ok ${step} - ${name}\n  ${String(err.message).split("\n")[0]}`);
+    failed.push(name);
     await page.screenshot({ path: join(ROOT, `tests/failure-${step}.png`) }).catch(() => {});
-    console.error(err);
-    await browser.close();
-    server.close();
-    process.exit(1);
+    await page.keyboard.press("Escape").catch(() => {});
   }
 }
 
@@ -158,11 +158,31 @@ await check("cook-along shows steps with timers and no stray text", async () => 
   await page.locator(".dish-title").waitFor();
 });
 
+await check("finishing cook-along twice still counts one cook", async () => {
+  await page.goto(BASE + "#/dish/seed-smoothie");
+  await page.getByText("Cook together").click();
+  await page.getByText("Let's cook ▶").click();
+  await page.getByText("Next ▶").click();
+  await page.getByText("Next ▶").click();
+  await page.getByText("Finish 🎉").click();
+  await page.getByText("You did it!").waitFor();
+  await page.getByText("◀ Back").click();
+  await page.getByText("Finish 🎉").click();
+  await page.getByText("You did it!").waitFor();
+  await page.getByText("Back to the recipe").click();
+  await page.getByText("We've cooked this 1 time!").waitFor();
+});
+
 await check("Claude key is saved and tested", async () => {
   await page.goto(BASE + "#/settings");
   await page.getByPlaceholder("sk-ant-…").fill("sk-ant-test-key");
   await page.getByText("Save & test").click();
   await page.getByText("The key works").waitFor();
+});
+
+await check("settings text boxes show what's saved", async () => {
+  const notes = page.getByPlaceholder("No peanuts. Kids like mild food. Dad doesn't eat mushrooms.");
+  assert.equal(await notes.inputValue(), "Kids like mild (not spicy) food.");
 });
 
 await check("a grown-up PIN protects settings", async () => {
@@ -333,6 +353,63 @@ await check("our own recipe can be written and edited", async () => {
   await page.locator(".dish-title", { hasText: "Dad's Fried Rice" }).waitFor();
 });
 
+await check("editing shows the recipe's ingredients and steps", async () => {
+  await page.goto(BASE + "#/edit/seed-bulgogi");
+  await page.locator(".screen.edit").waitFor();
+  assert.match(await page.getByPlaceholder("2 cups rice").inputValue(), /ribeye/);
+  assert.match(await page.getByPlaceholder("Wash the rice.").inputValue(), /marinate/);
+});
+
+await check("a photo added while editing is still there after Save", async () => {
+  await page.goto(BASE + "#/edit/seed-kimbap");
+  await page.locator(".screen.edit").waitFor();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByText("🖼️ Choose photo").click()]);
+  await chooser.setFiles(join(ROOT, "icons/icon-192.png"));
+  await page.locator(".toast", { hasText: "Photo added" }).waitFor();
+  await page.getByText("💾 Save").click();
+  await page.locator(".dish-title", { hasText: "Kimbap" }).waitFor();
+  await page.locator(".hero-slide img").waitFor({ timeout: 5000 });
+});
+
+await check("a link typed without https:// works, and javascript: links are dropped", async () => {
+  await page.goto(BASE + "#/edit/seed-kimbap");
+  await page.locator(".screen.edit").waitFor();
+  await page.getByPlaceholder("https://…").fill("www.maangchi.com/recipe/kimbap");
+  await page.getByText("💾 Save").click();
+  await page.locator(".dish-title", { hasText: "Kimbap" }).waitFor();
+  assert.equal(await page.locator(".source a").getAttribute("href"), "https://www.maangchi.com/recipe/kimbap");
+  await page.goto(BASE + "#/edit/seed-kimbap");
+  await page.getByPlaceholder("https://…").fill("javascript:alert(1)");
+  await page.getByText("💾 Save").click();
+  await page.locator(".dish-title", { hasText: "Kimbap" }).waitFor();
+  assert.equal(await page.locator("a[href^='javascript']").count(), 0);
+});
+
+await check("double-tapping Save adds the dish only once", async () => {
+  await page.goto(BASE + "#/new");
+  await page.getByPlaceholder("Grandma's Japchae").fill("Double Tap Soup");
+  await page.getByText("💾 Save").dblclick();
+  await page.locator(".dish-title", { hasText: "Double Tap Soup" }).waitFor();
+  await page.waitForTimeout(300);
+  await page.goto(BASE + "#/menu");
+  await page.getByPlaceholder("🔍 Find a dish or ingredient").fill("Double Tap");
+  assert.equal(await page.locator(".tile", { hasText: "Double Tap Soup" }).count(), 1);
+  await page.getByPlaceholder("🔍 Find a dish or ingredient").fill("");
+});
+
+await check("a half-typed recipe survives switching tabs", async () => {
+  await page.goto(BASE + "#/add");
+  await page.getByText("Write our own recipe").click();
+  await page.getByPlaceholder("Grandma's Japchae").fill("Half Done Bibimbap");
+  await page.locator(".tabbar a[data-tab=week]").click();
+  await page.locator(".week-grid").waitFor();
+  await page.goto(BASE + "#/add");
+  await page.getByText("Write our own recipe").click();
+  assert.equal(await page.getByPlaceholder("Grandma's Japchae").inputValue(), "Half Done Bibimbap");
+  await page.getByText("Start over").click();
+  assert.equal(await page.getByPlaceholder("Grandma's Japchae").inputValue(), "");
+});
+
 await check("the shopping list merges the week and remembers ticks", async () => {
   await page.locator(".tabbar a[data-tab=shop]").click();
   await page.getByText("Whole week").click();
@@ -356,12 +433,30 @@ await check("a backup file holds everything except the key", async () => {
   const data = JSON.parse(readFileSync(backupPath, "utf8"));
   assert.equal(data.app, "family-menu");
   assert.ok(data.dishes.length >= 41);
-  assert.equal(data.photos.length, 1);
+  assert.ok(data.photos.length >= 2, "photos from the gallery and the edit form");
   assert.ok(data.photos[0].blob.startsWith("data:image/jpeg;base64,"));
   assert.equal(data.settings.find((s) => s.key === "main").value.apiKey, "");
 });
 
+await check("a damaged backup file is refused and nothing is lost", async () => {
+  await page.goto(BASE + "#/menu");
+  await page.getByPlaceholder("🔍 Find a dish or ingredient").fill("");
+  const before = await page.locator(".count").textContent();
+  const data = JSON.parse(readFileSync(backupPath, "utf8"));
+  data.dishes.push({ name: "I have no id" });
+  const damaged = join(ROOT, "tests/failure-damaged-backup.json");
+  writeFileSync(damaged, JSON.stringify(data));
+  await page.goto(BASE + "#/settings");
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByText("Restore from file").click()]);
+  await chooser.setFiles(damaged);
+  await sheet().getByRole("button", { name: "Restore" }).click();
+  await page.locator(".toast", { hasText: "Nothing was changed" }).waitFor();
+  await page.goto(BASE + "#/menu");
+  assert.equal(await page.locator(".count").textContent(), before);
+});
+
 await check("erase everything, then restore from the backup", async () => {
+  await page.goto(BASE + "#/settings");
   await page.getByText("Erase everything").click();
   await sheet().getByRole("button", { name: "Erase everything" }).click();
   await page.getByText("Welcome to Family Menu!").waitFor();
@@ -389,6 +484,18 @@ await check("deleting a dish needs the PIN (restored from backup)", async () => 
   await sheet().getByRole("button", { name: "Delete" }).click();
   await page.locator(".screen.menu").waitFor();
   assert.equal(await page.locator(".tile", { hasText: "Roasted Sweet Potatoes" }).count(), 0);
+});
+
+await check("a forgotten PIN can be reset by a grown-up", async () => {
+  await page.reload();
+  await page.goto(BASE + "#/settings");
+  await page.getByText("Grown-ups only").waitFor();
+  await page.getByText("Forgot the PIN?").click();
+  const question = await page.locator(".pin-question").textContent();
+  const [, a, b, c] = question.match(/(\d+) × (\d+) \+ (\d+)/).map(Number);
+  await page.locator(".pin-answer").fill(String(a * b + c));
+  await page.getByText("Reset the PIN").click();
+  await page.getByText("No PIN yet").waitFor();
 });
 
 await check("no errors in the console", async () => {
@@ -443,4 +550,8 @@ await check("Android's Share menu delivers a post to the app (service worker sha
 
 await browser.close();
 server.close();
+if (failed.length) {
+  console.log(`\n${failed.length} of ${step} checks failed`);
+  process.exit(1);
+}
 console.log(`\nall ${step} checks passed`);

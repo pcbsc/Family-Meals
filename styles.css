@@ -13,13 +13,14 @@
   --ink: #2d2a26;
   --muted: #7a6f66;
   --line: #f0e4d6;
-  --primary: #ff6b4a;
-  --primary-dark: #e9512f;
+  /* Dark enough for white text to pass WCAG AA (4.5:1); tests/unit/app-files.test.mjs checks. */
+  --primary: #cf4520;
+  --primary-dark: #a8340f;
   --primary-soft: #ffe6de;
-  --green: #22a565;
+  --green: #1b8552;
   --green-soft: #ddf4e6;
   --yellow: #ffc93c;
-  --danger: #d93a2b;
+  --danger: #c8331f;
   --shadow: 0 2px 0 rgba(120, 80, 40, 0.06), 0 6px 18px rgba(120, 80, 40, 0.08);
   --radius: 22px;
   --tabbar: 78px;
@@ -189,7 +190,7 @@ img { max-width: 100%; display: block; }
 .btn.small { min-height: 40px; padding: 6px 14px; font-size: 16px; }
 .btn.big { min-height: 66px; font-size: 21px; padding: 14px 26px; }
 .btn.wide { width: 100%; }
-.btn.cook { background: var(--green); color: #fff; box-shadow: 0 4px 0 #17804c; }
+.btn.cook { background: var(--green); color: #fff; box-shadow: 0 4px 0 #136b40; }
 .btn.wish { background: var(--yellow); box-shadow: 0 4px 0 #e0a500; }
 .danger-text { color: var(--danger); }
 .center-btn { align-self: center; }

@@ -35,6 +35,10 @@ export function setRedraw(fn) {
 export function refresh() {
   redraw({ keepScroll: true });
 }
+/** Draws the current screen again from scratch (refresh() leaves forms alone). */
+export function redrawScreen() {
+  redraw({});
+}
 
 export function go(hash, { replace = false } = {}) {
   if (replace) location.replace(hash);

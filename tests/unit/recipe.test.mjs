@@ -154,3 +154,23 @@ test("whole things round up on the shopping list", () => {
   assert.equal(byKey["garlic"].amount, "3 cloves");
   assert.equal(byKey["apple"].amount, "2");
 });
+
+test("step numbers are removed, but amounts at the start of a step stay", async () => {
+  const { stripStepNumber } = await import("../../js/recipe.js");
+  assert.equal(stripStepNumber("1. Mix."), "Mix.");
+  assert.equal(stripStepNumber("Step 2: Stir."), "Stir.");
+  assert.equal(stripStepNumber("3) Bake."), "Bake.");
+  assert.equal(stripStepNumber("3-4 minutes later, flip."), "3-4 minutes later, flip.");
+  assert.equal(stripStepNumber("1.5 cups water go in."), "1.5 cups water go in.");
+  assert.equal(stripStepNumber("2 eggs go in the bowl."), "2 eggs go in the bowl.");
+});
+
+test("links are made safe to open", async () => {
+  const { cleanLink } = await import("../../js/recipe.js");
+  assert.equal(cleanLink("www.maangchi.com/recipe/kimbap"), "https://www.maangchi.com/recipe/kimbap");
+  assert.equal(cleanLink(" https://seonkyounglongest.com/bulgogi/ "), "https://seonkyounglongest.com/bulgogi/");
+  assert.equal(cleanLink("javascript:alert(1)"), "");
+  assert.equal(cleanLink("data:text/html,hi"), "");
+  assert.equal(cleanLink("Grandma's kitchen"), "");
+  assert.equal(cleanLink(""), "");
+});

@@ -1,13 +1,13 @@
 // Week: seven days of meals. Tap a spot to fill it, let the kids choose,
 // fill the week with favorites (no AI), or have Claude plan it.
-import { h, openSheet, toast, confetti, confirmSheet, grownUpCheck, clearChildren, prettyDate } from "../ui.js";
+import { h, openSheet, toast, confetti, confirmSheet, clearChildren, prettyDate, once } from "../ui.js";
 import { MEALS } from "../seed.js";
 import { dateKey, fromKey, addDays, weekStart, weekDays, fillWithFavorites, isFavorite } from "../planner.js";
 import {
   state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, saveDish, dishList, members, memberById,
   removeWish, wishLabel, planHistory, go, refresh,
 } from "../store.js";
-import { dishArt, pickDishes, stepper, chip, progressSheet, needKeySheet } from "../components.js";
+import { grownUp, dishArt, pickDishes, stepper, chip, progressSheet, needKeySheet } from "../components.js";
 
 function currentStart(params) {
   const w = params.get("w");
@@ -143,7 +143,7 @@ function emptySlots(days, meals, { includePast = false } = {}) {
   return out;
 }
 
-async function fillFavorites(days) {
+async function fillFavoritesNow(days) {
   const empty = emptySlots(days, enabledMeals());
   if (!empty.length) return toast("Every spot is already filled!", { emoji: "👍" });
   if (!state.dishes.size) return toast("Add some dishes to the menu first.", { emoji: "📖" });
@@ -157,6 +157,9 @@ async function fillFavorites(days) {
   toast(`Filled ${picks.length} meals with family favorites!`, { emoji: "🎲" });
   refresh();
 }
+
+// A double-tap shouldn't fill the week twice.
+const fillFavorites = once(fillFavoritesNow);
 
 function buildPlanRequest({ slotsToFill, days, note, newIdeas }) {
   const history = planHistory(28);
@@ -249,7 +252,7 @@ function planSheet(days) {
         oninput: (e) => (note = e.target.value),
       }),
       h("button.btn.primary.big.wide", {
-        onclick: async () => {
+        onclick: once(async () => {
           const chosen = enabledMeals().filter((m) => meals.has(m.key));
           if (!chosen.length) return toast("Pick at least one meal.", { emoji: "☝️" });
           const today = dateKey(new Date());
@@ -259,13 +262,25 @@ function planSheet(days) {
           if (!slotsToFill.length) return toast("Every spot is already filled! Try 'Redo the whole week'.", { emoji: "👍" });
           await close();
           runPlan({ days, slotsToFill, note, newIdeas });
-        },
+        }),
       }, "✨ Make our plan"),
     );
   }, { title: "✨ Plan the week with Claude" });
 }
 
-async function runPlan({ days, slotsToFill, note, newIdeas }) {
+let planning = false;
+
+async function runPlan(options) {
+  if (planning) return;
+  planning = true;
+  try {
+    await planOnce(options);
+  } finally {
+    planning = false;
+  }
+}
+
+async function planOnce({ days, slotsToFill, note, newIdeas }) {
   const request = buildPlanRequest({ slotsToFill, days, note, newIdeas });
   const progress = progressSheet("✨ Claude is planning…");
   let plan;
@@ -328,7 +343,8 @@ function previewPlan(plan, retry) {
       h("div.row.wrap",
         h("button.btn.soft", { onclick: async () => { await close(); retry(); } }, "🔁 Try again"),
         h("button.btn.primary.grow", {
-          onclick: async () => {
+          // Once only: a second tap would add Claude's new dishes to the menu twice.
+          onclick: once(async () => {
             const ids = new Map();
             for (const [key, recipe] of newByKey) {
               const saved = await saveDish({ ...recipe, addedBy: "claude-plan" });
@@ -345,7 +361,7 @@ function previewPlan(plan, retry) {
             confetti();
             toast("Our week is planned!", { emoji: "✨" });
             refresh();
-          },
+          }),
         }, "✅ Use this plan"),
       ),
     ),
@@ -377,7 +393,7 @@ function moreSheet(start, days) {
       h("button.btn.danger", {
         onclick: async () => {
           await close();
-          if (!(await grownUpCheck(state.settings.pin))) return;
+          if (!(await grownUp())) return;
           if (!(await confirmSheet("Clear every meal this week?", { yes: "Clear the week", danger: true }))) return;
           for (const d of days) for (const m of MEALS) {
             const slot = getSlot(dateKey(d), m.key);

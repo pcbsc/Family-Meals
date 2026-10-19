@@ -1,9 +1,9 @@
 // Settings (grown-ups only, behind the PIN if one is set) and the first-run
 // welcome that sets up the family and the starter menu.
-import { h, toast, confirmSheet, grownUpCheck, downloadFile, clearChildren, openSheet, confetti } from "../ui.js";
+import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti } from "../ui.js";
 import { MEALS, AVATARS, STARTER_DISHES } from "../seed.js";
 import { state, saveSettings, addStarterDishes, loadAll, go, refresh, db } from "../store.js";
-import { backHeader, stepper, chip } from "../components.js";
+import { grownUp, backHeader, stepper, chip } from "../components.js";
 
 function avatarPicker(current, onPick) {
   openSheet((close) =>
@@ -103,7 +103,7 @@ function restoreBackup() {
 }
 
 export async function viewSettings() {
-  if (!(await grownUpCheck(state.settings.pin))) {
+  if (!(await grownUp())) {
     go("#/today", { replace: true });
     return null;
   }

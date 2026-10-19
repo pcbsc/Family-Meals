@@ -1,9 +1,9 @@
 // Today: the home screen kids see first. Today's meals, a "pick tonight's
 // dinner" game when a grown-up set choices, "how was last night?", and wishes.
-import { h, confetti, toast, prettyDate, grownUpCheck } from "../ui.js";
+import { h, confetti, toast, prettyDate } from "../ui.js";
 import { dateKey, addDays } from "../planner.js";
 import { state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, go, refresh, saveSettings } from "../store.js";
-import { dishArt, dishTile, rateSheet, wishFlow, pickDishes } from "../components.js";
+import { grownUp, dishArt, dishTile, rateSheet, wishFlow, pickDishes } from "../components.js";
 
 function mealCard(date, meal) {
   const slot = getSlot(dateKey(date), meal.key);
@@ -125,7 +125,7 @@ function grownUpBanners() {
       h("button.btn.soft", {
         onclick: async () => {
           await saveSettings({ backupNudgeAt: Date.now() });
-          if (await grownUpCheck(state.settings.pin)) go("#/settings");
+          if (await grownUp()) go("#/settings");
           else refresh();
         },
       }, "Back up"),

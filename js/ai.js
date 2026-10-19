@@ -3,6 +3,7 @@
 // with the family's own key (saved only on this device).
 import Anthropic from "../vendor/anthropic-sdk.mjs";
 import { MEALS, CATEGORIES } from "./seed.js";
+import { cleanLink } from "./recipe.js";
 
 const MODEL = "claude-opus-5-5";
 // If Claude's safety filters ever decline a request, the API retries it on the
@@ -217,8 +218,8 @@ async function runUntilTool({ apiKey, system, content, tools, toolName, effort, 
   }
 }
 
-function str(v) {
-  return typeof v === "string" ? v.trim() : "";
+function str(v, max = 2000) {
+  return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
 function int(v, fallback, max) {
@@ -229,23 +230,24 @@ function int(v, fallback, max) {
 /** Tidies a recipe Claude returned so the app can rely on every field. Returns null if unusable. */
 export function cleanRecipe(r) {
   if (!r || typeof r !== "object") return null;
-  const lines = (a) => (Array.isArray(a) ? a.map(str).filter(Boolean) : []);
+  // Caps keep a strange page from filling the menu with thousands of lines.
+  const lines = (a, most) => (Array.isArray(a) ? a.map((l) => str(l, 300)).filter(Boolean).slice(0, most) : []);
   const recipe = {
-    name: str(r.name),
-    nameKo: str(r.nameKo),
-    emoji: str(r.emoji) || "🍽️",
-    description: str(r.description),
+    name: str(r.name, 120),
+    nameKo: str(r.nameKo, 60),
+    emoji: str(r.emoji, 16) || "🍽️",
+    description: str(r.description, 300),
     meals: (Array.isArray(r.meals) ? r.meals : []).filter((m) => MEAL_KEYS.includes(m)),
     categories: (Array.isArray(r.categories) ? r.categories : []).filter((c) => CATEGORY_KEYS.includes(c)),
     servings: int(r.servings, 4, 50) || 4,
     prepMinutes: int(r.prepMinutes, 0, 24 * 60),
     cookMinutes: int(r.cookMinutes, 0, 24 * 60),
     spicy: [0, 1, 2].includes(r.spicy) ? r.spicy : 0,
-    ingredients: lines(r.ingredients),
-    steps: lines(r.steps),
+    ingredients: lines(r.ingredients, 80),
+    steps: lines(r.steps, 60),
     notes: str(r.notes),
-    sourceName: str(r.sourceName),
-    sourceUrl: /^https?:\/\//.test(str(r.sourceUrl)) ? str(r.sourceUrl) : "",
+    sourceName: str(r.sourceName, 120),
+    sourceUrl: cleanLink(str(r.sourceUrl)),
     imageUrl: /^https:\/\//.test(str(r.imageUrl)) ? str(r.imageUrl) : "",
   };
   if (!recipe.meals.length) recipe.meals = ["dinner"];
@@ -331,16 +333,18 @@ Finish by calling save_week_plan exactly once.`;
 export async function planWeek({ apiKey, request, menuIds, onProgress, signal }) {
   const wanted = new Set(request.slotsToFill.map((s) => `${s.date}|${s.meal}`));
   const check = (input) => {
-    const keys = new Set((input?.newDishes || []).map((n) => n?.key));
+    if (!Array.isArray(input?.slots) || !input.slots.length) return "The plan has no meals in it.";
+    if (!Array.isArray(input?.newDishes)) return "newDishes must be a list (it can be empty).";
+    const keys = new Set(input.newDishes.map((n) => n?.key));
     const bad = [];
-    for (const s of input?.slots || []) {
-      for (const ref of s?.dishes || []) {
+    for (const s of input.slots) {
+      if (!Array.isArray(s?.dishes)) return "Every slot needs a dishes list.";
+      for (const ref of s.dishes) {
         if (typeof ref !== "string") bad.push(String(ref));
         else if (ref.startsWith("new:") ? !keys.has(ref.slice(4)) : !menuIds.has(ref)) bad.push(ref);
       }
     }
-    for (const n of input?.newDishes || []) if (!cleanRecipe(n?.recipe)) bad.push(`new:${n?.key}`);
-    if (!Array.isArray(input?.slots) || !input.slots.length) return "The plan has no meals in it.";
+    for (const n of input.newDishes) if (!cleanRecipe(n?.recipe)) bad.push(`new:${n?.key}`);
     return bad.length ? `These dish references don't match the menu or newDishes: ${bad.slice(0, 10).join(", ")}. Use ids from the menu or 'new:<key>' for complete new dishes.` : null;
   };
   const result = await runUntilTool({

@@ -20,6 +20,8 @@ export function h(spec, props, ...children) {
     else if (k === "style" && typeof v === "object") Object.assign(el.style, v);
     else if (k === "class") el.className += " " + v;
     else if (k === "dataset") Object.assign(el.dataset, v);
+    // A textarea ignores a value attribute, so the text has to go in the property.
+    else if (k === "value") el.value = v;
     else if (k in el && k !== "list" && k !== "form" && typeof v !== "string") el[k] = v;
     else el.setAttribute(k, v === true ? "" : v);
   }
@@ -106,13 +108,16 @@ export function openSheet(build, { title, wide = false, onClose } = {}) {
   document.body.append(backdrop, panel);
   history.pushState({ sheet: true }, "");
   sheetStack.push(sheet);
-  requestAnimationFrame(() => panel.querySelector("[autofocus]")?.focus());
+  panel.tabIndex = -1;
+  requestAnimationFrame(() => (panel.querySelector("[autofocus]") || panel).focus({ preventScroll: true }));
   return sheet;
 }
 
-export async function closeAllSheets() {
-  while (sheetStack.length) await sheetStack[sheetStack.length - 1].close();
-}
+document.addEventListener("keydown", (e) => {
+  const top = sheetStack[sheetStack.length - 1];
+  if (e.key === "Escape" && top && !top.closing) top.close();
+});
+
 
 export function confirmSheet(message, { yes = "Yes", no = "Cancel", danger = false } = {}) {
   return new Promise((resolve) => {
@@ -135,6 +140,20 @@ export function confirmSheet(message, { yes = "Yes", no = "Cancel", danger = fal
     );
     return s;
   });
+}
+
+/** Wraps a button's handler so a double-tap can't run it twice at the same time. */
+export function once(fn) {
+  let busy = false;
+  return async (...args) => {
+    if (busy) return;
+    busy = true;
+    try {
+      return await fn(...args);
+    } finally {
+      busy = false;
+    }
+  };
 }
 
 // ---------- Toasts ----------
@@ -170,12 +189,20 @@ export function confetti(emojis = ["🎉", "⭐", "✨", "💛", "🍚", "🥳"]
 
 let unlockedUntil = 0;
 
-/** Resolves true when a grown-up has entered the PIN (or there's no PIN). */
-export function grownUpCheck(pin) {
+/**
+ * Resolves true when a grown-up has entered the PIN (or there's no PIN).
+ * onReset runs when a grown-up answers the "Forgot the PIN?" sum; it should clear the PIN.
+ */
+export function grownUpCheck(pin, { onReset } = {}) {
   if (!pin || Date.now() < unlockedUntil) return Promise.resolve(true);
   return new Promise((resolve) => {
     let entered = "";
     let ok = false;
+    const unlock = (close) => {
+      ok = true;
+      unlockedUntil = Date.now() + 10 * 60 * 1000;
+      close().then(() => resolve(true));
+    };
     const dots = h("div.pin-dots");
     const msg = h("p.muted.center", "Grown-ups only: enter the PIN");
     const draw = () => {
@@ -191,9 +218,7 @@ export function grownUpCheck(pin) {
           draw();
           if (entered.length === pin.length) {
             if (entered === pin) {
-              ok = true;
-              unlockedUntil = Date.now() + 10 * 60 * 1000;
-              close().then(() => resolve(true));
+              unlock(close);
             } else {
               msg.textContent = "Oops, that's not it. Try again!";
               dots.classList.add("shake");
@@ -203,14 +228,40 @@ export function grownUpCheck(pin) {
             }
           }
         };
-        return h("div.stack.center",
+        const body = h("div.stack.center",
           h("div.huge-emoji", "🔒"),
           msg,
           dots,
           h("div.pin-pad", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map((k) =>
             k ? h("button.pin-key", { onclick: () => press(k) }, k) : h("span"),
           )),
+          onReset ? h("button.btn.ghost", { onclick: () => forgot() }, "Forgot the PIN?") : null,
         );
+        const forgot = () => {
+          const pickInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+          const [a, b, c] = [pickInt(6, 12), pickInt(6, 12), pickInt(11, 49)];
+          let answer = "";
+          const note = h("p.muted.center", "Answer this and the PIN is removed. You can set a new one in Settings.");
+          clearChildren(body);
+          body.append(
+            h("div.huge-emoji", "🧮"),
+            h("p.big-text.pin-question", `What is ${a} × ${b} + ${c}?`),
+            h("input.text.pin-input.pin-answer", { type: "number", inputmode: "numeric", autofocus: true, oninput: (e) => (answer = e.target.value) }),
+            note,
+            h("button.btn.primary.wide", {
+              onclick: async () => {
+                if (Number(answer) !== a * b + c) {
+                  note.textContent = "Not quite. Try again!";
+                  return;
+                }
+                await onReset();
+                unlock(close);
+              },
+            }, "Reset the PIN"),
+          );
+          body.querySelector("input").focus();
+        };
+        return body;
       },
       { onClose: () => !ok && resolve(false) },
     );

@@ -60,14 +60,6 @@ export async function put(store, value) {
   return value;
 }
 
-export async function putMany(store, values) {
-  const db = await open();
-  const tx = db.transaction(store, "readwrite");
-  const os = tx.objectStore(store);
-  for (const v of values) os.put(v);
-  await done(tx);
-}
-
 export async function remove(store, id) {
   const db = await open();
   const tx = db.transaction(store, "readwrite");
@@ -108,6 +100,7 @@ function blobToDataUrl(blob) {
 }
 
 async function dataUrlToBlob(url) {
+  if (typeof url !== "string" || !url.startsWith("data:image/")) throw new Error("not a photo");
   return (await fetch(url)).blob();
 }
 
@@ -135,32 +128,49 @@ export async function exportAll() {
   return out;
 }
 
-/** Replaces everything with a backup's contents (keeping this device's Claude key). */
+/**
+ * Replaces everything with a backup's contents (keeping this device's Claude key).
+ * The whole file is checked and converted first, then swapped in with one
+ * transaction, so a damaged file changes nothing.
+ */
 export async function importAll(data) {
   if (!data || data.app !== "family-menu") throw new Error("That file isn't a Family Menu backup.");
+  const damaged = () => new Error("This backup file is damaged, so it wasn't used. Nothing was changed.");
+  if (!Array.isArray(data.dishes) || !Array.isArray(data.settings)) throw damaged();
   const current = await get("settings", "main");
+  const rows = {};
   for (const store of STORES) {
-    const rows = Array.isArray(data[store]) ? data[store] : [];
-    await clear(store);
-    if (store === "photos") {
-      const photos = [];
-      for (const p of rows) {
-        photos.push({
-          ...p,
-          blob: p.blob ? await dataUrlToBlob(p.blob) : null,
-          thumb: p.thumb ? await dataUrlToBlob(p.thumb) : null,
-        });
-      }
-      await putMany("photos", photos);
-    } else if (store === "settings") {
-      const fixed = rows.map((r) =>
-        r.key === "main" ? { ...r, value: { ...r.value, apiKey: current?.value?.apiKey || "" } } : r,
-      );
-      await putMany("settings", fixed);
-    } else {
-      await putMany(store, rows);
-    }
+    const key = store === "settings" ? "key" : "id";
+    const list = Array.isArray(data[store]) ? data[store] : [];
+    if (list.some((r) => !r || typeof r !== "object" || typeof r[key] !== "string" || !r[key])) throw damaged();
+    rows[store] = list;
   }
+  try {
+    rows.photos = await Promise.all(rows.photos.map(async (p) => ({
+      ...p,
+      blob: p.blob ? await dataUrlToBlob(p.blob) : null,
+      thumb: p.thumb ? await dataUrlToBlob(p.thumb) : null,
+    })));
+  } catch {
+    throw damaged();
+  }
+  rows.settings = rows.settings.map((r) =>
+    r.key === "main" ? { ...r, value: { ...r.value, apiKey: current?.value?.apiKey || "" } } : r,
+  );
+  const db = await open();
+  const tx = db.transaction(STORES, "readwrite");
+  try {
+    for (const store of STORES) {
+      const os = tx.objectStore(store);
+      os.clear();
+      for (const r of rows[store]) os.put(r);
+    }
+  } catch {
+    tx.abort();
+  }
+  await done(tx).catch(() => {
+    throw damaged();
+  });
 }
 
 // The service worker drops things shared from other apps (Instagram, TikTok,

@@ -1,17 +1,17 @@
 // Dish: the recipe card. Photos, hearts and faces, servings that rescale the
 // ingredients, and Cook-along: one big step at a time with timers.
 import {
-  h, toast, confetti, confirmSheet, grownUpCheck, preparePhoto, pickImage, ding, speak, keepScreenOn,
+  h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
   minutesText, clearChildren,
 } from "../ui.js";
 import { MEALS, SPICE } from "../seed.js";
-import { scaleIngredient, parseIngredient, findTimers } from "../recipe.js";
+import { scaleIngredient, parseIngredient, findTimers, cleanLink } from "../recipe.js";
 import { dateKey } from "../planner.js";
 import {
   state, updateDish, deleteDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh,
 } from "../store.js";
 import {
-  dishArt, backHeader, stepper, rateSheet, familyFaces, wishFlow, planItSheet, categoryLabel,
+  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, wishFlow, planItSheet, categoryLabel,
 } from "../components.js";
 
 function notFound() {
@@ -44,7 +44,7 @@ function photoStrip(dish) {
       slide.append(h("button.icon-btn.photo-x", {
         "aria-label": "Remove this photo",
         onclick: async () => {
-          if (!(await grownUpCheck(state.settings.pin))) return;
+          if (!(await grownUp())) return;
           if (!(await confirmSheet("Remove this photo?", { yes: "Remove", danger: true }))) return;
           await removePhotoFromDish(dish.id, id);
           refresh();
@@ -63,6 +63,14 @@ function photoStrip(dish) {
 }
 
 const servingsMemory = new Map();
+
+function sourceLine(dish) {
+  // Old or restored dishes may hold a link that isn't a web address; never put that behind a tap.
+  const link = cleanLink(dish.sourceUrl);
+  if (!link && !dish.sourceName) return null;
+  return h("p.source", "From ",
+    link ? h("a", { href: link, target: "_blank", rel: "noopener" }, dish.sourceName || new URL(link).hostname, " ↗") : dish.sourceName);
+}
 
 export function viewDish({ match }) {
   const dish = state.dishes.get(match[1]);
@@ -94,7 +102,7 @@ export function viewDish({ match }) {
       back: "#/menu",
       right: h("button.icon-btn", {
         "aria-label": "Edit dish",
-        onclick: async () => (await grownUpCheck(state.settings.pin)) && go(`#/edit/${dish.id}`),
+        onclick: async () => (await grownUp()) && go(`#/edit/${dish.id}`),
       }, "✏️"),
     }),
     photoStrip(dish),
@@ -142,14 +150,11 @@ export function viewDish({ match }) {
         : h("p.muted", "No steps yet."),
     ),
     dish.notes ? h("section.card.notes", h("h2", "💡 Tips"), h("p", dish.notes)) : null,
-    dish.sourceUrl || dish.sourceName
-      ? h("p.source", "From ",
-        dish.sourceUrl ? h("a", { href: dish.sourceUrl, target: "_blank", rel: "noopener" }, dish.sourceName || new URL(dish.sourceUrl).hostname, " ↗") : dish.sourceName)
-      : null,
+    sourceLine(dish),
     dish.timesCooked ? h("p.muted.center", `We've cooked this ${dish.timesCooked} time${dish.timesCooked === 1 ? "" : "s"}! 🎉`) : null,
     h("button.btn.ghost.danger-text.center-btn", {
       onclick: async () => {
-        if (!(await grownUpCheck(state.settings.pin))) return;
+        if (!(await grownUp())) return;
         if (!(await confirmSheet(`Delete ${dish.name} from our menu? Its photos go too.`, { yes: "Delete", danger: true }))) return;
         await deleteDish(dish.id);
         toast(`${dish.name} was deleted.`, { emoji: "🗑️" });
@@ -161,7 +166,7 @@ export function viewDish({ match }) {
 
 // ---------- Cook-along ----------
 
-const GROWN_UP = /knife|cut |cut\b|slice|chop|dice|mince|grate|boil|fry|oven|sear|blanch|hot|drain|blend|simmer|stove|pan\b|bake|roast|grill|broil|steam|skillet|pot\b/i;
+const GROWN_UP = /\b(knife|cut|slice|chop|dice|mince|grate|boil|fry|fried|oven|sear|blanch|hot|drain|blend|simmer|stove|pan|bake|roast|grill|broil|steam|skillet|pot)/i;
 
 let activeTimer = null;
 
@@ -291,8 +296,12 @@ export function viewCook({ match, params, setCleanup }) {
     if (Math.abs(dx) > 70) show(index + (dx < 0 ? 1 : -1));
   });
 
-  keepScreenOn(true);
+  // Android drops the keep-awake lock when you switch apps; ask again on return.
+  const wake = () => document.visibilityState === "visible" && keepScreenOn(true);
+  wake();
+  document.addEventListener("visibilitychange", wake);
   setCleanup(() => {
+    document.removeEventListener("visibilitychange", wake);
     keepScreenOn(false);
     if ("speechSynthesis" in window) speechSynthesis.cancel();
   });

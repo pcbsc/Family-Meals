@@ -1,4 +1,4 @@
 node_modules/
-tests/failure-*.png
+tests/failure-*
 .DS_Store
 Thumbs.db

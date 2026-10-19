@@ -42,11 +42,13 @@ const QTY_RE = new RegExp(`^(${NUMBER})(?:\\s*(?:-|–|—|to)\\s*(${NUMBER}))?`
 export function parseNumber(text) {
   const s = text.trim();
   let m;
-  if ((m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/))) return +m[1] + +m[2] / +m[3];
-  if ((m = s.match(/^(\d+)\/(\d+)$/))) return +m[2] ? +m[1] / +m[2] : null;
-  if ((m = s.match(new RegExp(`^(\\d*)\\s*([${FRACTION_CHARS}])$`)))) return (m[1] ? +m[1] : 0) + FRACTIONS[m[2]];
-  if (/^\d+(?:\.\d+)?$/.test(s)) return +s;
-  return null;
+  let value = null;
+  if ((m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/))) value = +m[1] + +m[2] / +m[3];
+  else if ((m = s.match(/^(\d+)\/(\d+)$/))) value = +m[1] / +m[2];
+  else if ((m = s.match(new RegExp(`^(\\d*)\\s*([${FRACTION_CHARS}])$`)))) value = (m[1] ? +m[1] : 0) + FRACTIONS[m[2]];
+  else if (/^\d+(?:\.\d+)?$/.test(s)) value = +s;
+  // "3/0" or a 400-digit number isn't an amount.
+  return Number.isFinite(value) ? value : null;
 }
 
 /** Splits "1 1/2 cups rice, rinsed" into its parts. Lines ending in ":" are headers. */
@@ -316,6 +318,33 @@ export function findTimers(step) {
   return found;
 }
 
+// "1. Mix", "Step 2: Stir", "3) Bake", "4 - Serve", but not "3-4 minutes" or "1.5 cups".
+const STEP_NUMBER = /^\s*(?:step\s*)?\d{1,2}\s*(?:[.)](?!\d)|:|\s-\s)\s*/i;
+
+/** Removes the "1." someone typed in front of a step. */
+export function stripStepNumber(step) {
+  return String(step ?? "").replace(STEP_NUMBER, "").trim();
+}
+
+/**
+ * Makes a link safe to put behind a button: adds https:// when someone typed
+ * "www.site.com/…", and refuses anything that isn't a web address (javascript:, data:…).
+ */
+export function cleanLink(text) {
+  let s = String(text ?? "").trim();
+  if (!s) return "";
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) {
+    if (!/^[\w-]+(\.[\w-]+)+([/?#:]|$)/.test(s)) return "";
+    s = `https://${s}`;
+  }
+  try {
+    const url = new URL(s);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
 const INGREDIENT_HEAD = /^(ingredients?|what you('ll)? need|you('ll)? need|for the [a-z ]+|shopping list)\b[:\s]*$/i;
 const STEP_HEAD = /^(instructions?|directions?|method|steps?|how to( make)?( it)?|preparation|to make)\b[:\s]*$/i;
 
@@ -348,9 +377,9 @@ export function parseRecipeText(text) {
       mode = "steps";
       continue;
     }
-    const cleaned = line.replace(/^[-•*▢☐□✓✔·]\s*/, "").replace(/^(step\s*)?\d+\s*[.):-]\s+/i, "");
+    const cleaned = stripStepNumber(line.replace(/^[-•*▢☐□✓✔·]\s*/, ""));
     const looksLikeIngredient = parseIngredient(cleaned).qty != null && cleaned.length < 90;
-    const numbered = /^(step\s*)?\d+\s*[.):-]\s+/i.test(line);
+    const numbered = STEP_NUMBER.test(line);
     if (!name && !mode && !looksLikeIngredient && !numbered && line.length < 80) {
       name = line.replace(/[#*_]/g, "").trim();
       continue;

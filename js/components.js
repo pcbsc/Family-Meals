@@ -1,12 +1,17 @@
 // Pieces used on several screens: dish pictures and tiles, the dish picker,
 // rating faces, the "I want…" wish flow, plan-it, and the Claude progress view.
-import { h, openSheet, toast, confetti, colorFor, clearChildren, prettyDate } from "./ui.js";
+import { h, openSheet, toast, confetti, colorFor, clearChildren, prettyDate, grownUpCheck, once } from "./ui.js";
 import { MEALS, CATEGORIES, FACES } from "./seed.js";
 import { dateKey, addDays, isFavorite } from "./planner.js";
 import {
   state, members, memberById, enabledMeals, dishList, rating, rateDish, photoUrl, getSlot,
-  setSlotDishes, slotDishes, addWish, go, refresh,
+  setSlotDishes, slotDishes, addWish, saveSettings, go, refresh,
 } from "./store.js";
+
+/** Asks for the grown-up PIN if one is set. A forgotten PIN can be reset by answering a sum. */
+export function grownUp() {
+  return grownUpCheck(state.settings.pin, { onReset: () => saveSettings({ pin: "" }) });
+}
 
 export function faceFor(score) {
   if (score == null) return null;
@@ -208,13 +213,13 @@ export function wishFlow(presetDishId = null) {
   openSheet((close) => {
     const body = h("div.stack");
     let who = null;
-    const save = async (wish) => {
+    const save = once(async (wish) => {
       await addWish({ ...wish, memberId: who.id });
       await close();
       confetti(["🙋", "⭐", "💛", "🍚"]);
       toast(`Got it, ${who.name}! The grown-ups will see your wish.`, { emoji: "🙋" });
       refresh();
-    };
+    });
     const stepWhat = () => {
       clearChildren(body);
       let text = "";
