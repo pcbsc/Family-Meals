@@ -87,7 +87,7 @@ export function viewShop({ params }) {
       const inAisle = items.filter((i) => i.aisle === aisle.key && !i.pantry);
       const extras = aisle.key === "other" ? shop.extras : [];
       if (!inAisle.length && !extras.length) continue;
-      body.append(h("section.card.aisle",
+      body.append(h(`section.card.aisle.aisle-${aisle.key}`,
         h("h2", aisle.emoji, " ", aisle.label),
         h("ul.shop-list",
           inAisle.map(row),

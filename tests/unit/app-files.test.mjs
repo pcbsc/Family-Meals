@@ -36,9 +36,17 @@ test("text colors meet WCAG AA contrast (4.5:1)", () => {
     [vars["primary-dark"], "#ffffff", "amounts and links on white"],
     [vars.muted, vars.bg, "grey text on the page"],
     [vars.muted, "#ffffff", "grey text on cards"],
+    [vars.ink, vars.bg, "text on the page"],
+    [vars["primary-dark"], vars.bg, "cook-along step words"],
+    ...Object.entries(vars).filter(([k]) => k.startsWith("aisle-")).flatMap(([k, color]) => [
+      ["#ffffff", color, `white on the ${k} header`],
+      [color, "#ffffff", `${k} amounts on white`],
+    ]),
   ];
   for (const [fg, bg, what] of pairs) {
     const ratio = contrast(fg, bg);
     assert.ok(ratio >= 4.5, `${what}: ${ratio.toFixed(2)}:1`);
   }
+  // Big orange titles only need 3:1 (WCAG "large text").
+  assert.ok(contrast(vars.primary, vars.bg) >= 3, "orange titles on the page");
 });

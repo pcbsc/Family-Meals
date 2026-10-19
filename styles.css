@@ -10,8 +10,9 @@
 :root {
   --bg: #fff8ee;
   --card: #ffffff;
-  --ink: #2d2a26;
-  --muted: #7a6f66;
+  /* Warm browns and tomato orange, from the Canva redesign. */
+  --ink: #4a2e1c;
+  --muted: #7a5a45;
   --line: #f0e4d6;
   /* Dark enough for white text to pass WCAG AA (4.5:1); tests/unit/app-files.test.mjs checks. */
   --primary: #cf4520;
@@ -21,6 +22,15 @@
   --green-soft: #ddf4e6;
   --yellow: #ffc93c;
   --danger: #c8331f;
+  /* Shopping aisle colors: white header text on each passes WCAG AA too. */
+  --aisle-produce: #1b8552;
+  --aisle-meat: #c8331f;
+  --aisle-dairy: #2b6cb0;
+  --aisle-asian: #a02c6d;
+  --aisle-grains: #9a560a;
+  --aisle-pantry: #7a4a26;
+  --aisle-frozen: #1f6f8b;
+  --aisle-other: #5c5650;
   --shadow: 0 2px 0 rgba(120, 80, 40, 0.06), 0 6px 18px rgba(120, 80, 40, 0.08);
   --radius: 22px;
   --tabbar: 78px;
@@ -62,7 +72,7 @@ h1, h2, h3 {
   font-weight: 900;
 }
 
-h1 { font-size: 30px; }
+h1 { font-size: 30px; color: var(--primary); }
 h2 { font-size: 22px; }
 h3 { font-size: 19px; }
 
@@ -305,7 +315,6 @@ img { max-width: 100%; display: block; }
   position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%;
   background: rgba(0,0,0,.6); color: #fff; display: grid; place-items: center; font-size: 15px; padding-left: 3px;
 }
-.tile-heart + .tile-video { top: 50px; }
 .tile-face { position: absolute; top: 14px; left: 14px; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
 .tile-check {
   position: absolute; top: 12px; left: 12px; width: 36px; height: 36px; border-radius: 50%;
@@ -829,3 +838,72 @@ details.more > .stack { margin-top: 10px; }
 .almost-dish { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 0; color: var(--ink); }
 .list-for .row { gap: 8px; }
 .chip.static { cursor: default; }
+
+/* ---------- Canva redesign ---------- */
+
+/* Today: the next meal is a big photo card with its name written on the picture. */
+.meal-card.photo { position: relative; padding: 0; overflow: hidden; gap: 0; border-radius: 28px; }
+.meal-card.photo .art-meal { aspect-ratio: 16 / 11; border-radius: 0; }
+.meal-card.photo .art-meal .art-emoji { font-size: clamp(80px, 26vw, 140px); }
+.meal-overlay {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 2px;
+  padding: 48px 18px 16px; background: linear-gradient(180deg, transparent, rgba(58, 30, 12, 0.82));
+  color: #fff;
+}
+.meal-overlay .meal-label { padding: 0; opacity: 1; font-size: 16px; }
+.meal-overlay .meal-name { padding: 0; font-size: 32px; text-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.meal-overlay .meal-more { padding: 0; color: #fff; opacity: 0.9; }
+
+/* The day's other meals: white cards with a big picture, an orange label and an arrow. */
+.meal-row { background: #fff; min-height: 96px; gap: 16px; }
+.meal-row .art-sm, .meal-row-emoji { width: 80px; height: 80px; border-radius: 20px; background: var(--meal, var(--bg)); }
+.meal-row .art-sm .art-emoji, .meal-row-emoji { font-size: 44px; }
+.meal-row .meal-label { color: var(--primary); opacity: 1; font-size: 15px; }
+.meal-row .meal-name { font-size: 23px; }
+.meal-row-text { flex: 1; }
+.meal-row-go { flex: none; font-size: 30px; font-weight: 900; color: var(--primary); }
+
+/* Whatever is picked is filled in orange. */
+.filter.on, .kind.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* Tab bar: the current tab is orange. */
+.tabbar { border-top: 0; box-shadow: 0 -4px 18px rgba(120, 80, 40, 0.10); border-radius: 22px 22px 0 0; }
+.tabbar a { color: var(--ink); }
+.tabbar a.on { color: var(--primary); background: var(--primary-soft); }
+
+/* Dish: the recipe slides up over its photo, with the buttons floating on the picture. */
+.screen.dish { position: relative; }
+.dish > .top.sub { position: absolute; top: max(16px, env(safe-area-inset-top)); left: 16px; right: 16px; z-index: 3; min-height: 0; }
+.dish > .hero { margin-top: calc(-1 * max(16px, env(safe-area-inset-top))); }
+.dish .hero-buttons { bottom: 46px; }
+.dish-title {
+  position: relative; margin: -46px -16px 0; padding: 22px 16px 0;
+  background: var(--bg); border-radius: 30px 30px 0 0;
+}
+@media (min-width: 700px) {
+  .dish > .hero { margin-top: 0; }
+  .dish > .top.sub { position: static; }
+  .dish-title { margin: 0; padding: 0; background: none; }
+  .dish .hero-buttons { bottom: 12px; }
+}
+.fact { color: var(--ink); }
+
+/* Cook-along: a big orange step number and orange step words. */
+.step-num { width: 96px; height: 96px; font-size: 54px; box-shadow: 0 6px 0 var(--primary-dark); }
+.step-text { color: var(--primary-dark); }
+
+/* Shopping: each aisle has a colored header, and amounts match it. */
+.aisle { --aisle: var(--aisle-other); padding-top: 0; overflow: hidden; }
+.aisle > h2 { margin: 0 -18px 4px; padding: 12px 18px; background: var(--aisle); color: #fff; font-size: 20px; }
+.aisle .shop-amount { color: var(--aisle); }
+.aisle-produce { --aisle: var(--aisle-produce); }
+.aisle-meat { --aisle: var(--aisle-meat); }
+.aisle-dairy { --aisle: var(--aisle-dairy); }
+.aisle-asian { --aisle: var(--aisle-asian); }
+.aisle-grains { --aisle: var(--aisle-grains); }
+.aisle-pantry { --aisle: var(--aisle-pantry); }
+.aisle-frozen { --aisle: var(--aisle-frozen); }
+.aisle.pantry { padding-top: 18px; }
+
+/* Menu tiles: the video badge sits on the picture's corner. */
+.art .tile-video { top: auto; bottom: 10px; right: 10px; }

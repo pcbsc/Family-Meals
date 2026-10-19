@@ -31,11 +31,13 @@ function mealCard(date, meal) {
     );
   }
   const [first] = items;
-  return h("button.meal-card", { style: { "--meal": meal.color }, onclick: () => go(`#/dish/${first.dish.id}`) },
+  return h("button.meal-card.photo", { style: { "--meal": meal.color }, onclick: () => go(`#/dish/${first.dish.id}`) },
     dishArt(first.dish, { kind: "full", className: "art-meal" }),
-    h("span.meal-label", meal.emoji, " ", meal.label),
-    h("span.meal-name", first.dish.name),
-    items.length > 1 ? h("span.meal-more", "with " + items.slice(1).map((i) => i.dish.name).join(", ")) : null,
+    h("span.meal-overlay",
+      h("span.meal-label", meal.emoji, " ", meal.label),
+      h("span.meal-name", first.dish.name),
+      items.length > 1 ? h("span.meal-more", "with " + items.slice(1).map((i) => i.dish.name).join(", ")) : null,
+    ),
   );
 }
 
@@ -57,6 +59,7 @@ function mealRow(date, meal) {
         ? h("span.meal-name", items.map((i) => i.dish.name).join(" + "))
         : h("span.meal-empty", kidsChoosing ? "🧒 Kids are choosing" : "➕ Pick"),
     ),
+    h("span.meal-row-go", { "aria-hidden": "true" }, "›"),
   );
 }
 
