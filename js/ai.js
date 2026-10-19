@@ -362,7 +362,9 @@ Plan meals the family will enjoy and that are good for growing kids:
 - Balance the week: vegetables every day, fish once or twice, a mix of beef, chicken, pork, tofu and eggs, not much fried or sugary food.
 - For a Korean-style dinner you may add one or two side dishes (banchan or a soup) from the menu after the main dish, like a real Korean table with rice.
 - Breakfasts are quick on weekdays (15 minutes or less) and can be special on weekends. Repeating a breakfast or snack is fine.
-- Keep it mild for the kids unless the notes say otherwise. If you include a spicy dish, say how to make it milder in "why".
+- Mostly Korean, Korean-American and Korean fusion dishes, unless the notes say otherwise, with some other family favorites mixed in.
+- spiceLevel is how spicy the family likes it ("mild", "medium" or "spicy"). With "medium" or "spicy", spicy dishes are welcome (some kids love spice), but no more than one very spicy dinner in a row. With "mild", say in "why" how to make any spicy dish milder.
+- healthyCooking true means they want healthier meals: more vegetables, fish and tofu, brown or multigrain rice, little fried or sugary food.
 - New ideas: add the requested number of new dishes that aren't on the menu yet. Find real recipes with web_search and read them with web_fetch. For Korean dishes prefer Seonkyoung Longest (seonkyounglongest.com), then Korean Bapsang, Maangchi or My Korean Kitchen; for other cuisines use well-known family-friendly recipe sites. Set sourceName and sourceUrl (and videoUrl if the page has the creator's video of it), keep the recipe's amounts, and write the steps in your own words, short and clear enough for a 7-year-old helper. Refer to each new dish in slots as "new:<key>".
 - Only fill the slots you're asked to fill.
 

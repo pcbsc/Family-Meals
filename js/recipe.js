@@ -235,8 +235,14 @@ function cleanName(item) {
     .trim();
 }
 
-function amountText(bucket) {
+function amountText(bucket, metric = false) {
   const parts = [];
+  if (metric) {
+    // Spoons stay spoons; cups and pints become ml, ounces and pounds grams.
+    if (bucket.volume >= 12) parts.push(bucket.volume * 4.92892 >= 1000 ? `${formatQty(bucket.volume * 4.92892 / 1000, "l")} l` : `${formatQty(bucket.volume * 4.92892, "ml")} ml`);
+    else if (bucket.volume) parts.push(bucket.volume >= 3 ? `${formatQty(bucket.volume / 3, "tbsp")} tbsp` : `${formatQty(bucket.volume, "tsp")} tsp`);
+    bucket = { ...bucket, volume: 0, weightMetric: bucket.weightMetric + bucket.weightImperial, weightImperial: 0 };
+  }
   if (bucket.volume) {
     const tsp = bucket.volume;
     if (tsp >= 12) parts.push(`${formatQty(tsp / 48, "cup")} cup${tsp / 48 > 1.01 ? "s" : ""}`);
@@ -267,7 +273,7 @@ function amountText(bucket) {
  * entries: [{ dish: { name, servings, ingredients: [string] }, servings }]
  * Returns items sorted by aisle, each { key, name, amount, aisle, pantry, dishes }.
  */
-export function buildGroceryList(entries) {
+export function buildGroceryList(entries, { metric = false } = {}) {
   const byKey = new Map();
   for (const { dish, servings } of entries) {
     if (!dish || !Array.isArray(dish.ingredients)) continue;
@@ -310,7 +316,7 @@ export function buildGroceryList(entries) {
     .map((e) => ({
       key: e.key,
       name: e.name.charAt(0).toUpperCase() + e.name.slice(1),
-      amount: amountText(e.bucket),
+      amount: amountText(e.bucket, metric),
       aisle: aisleFor(e.key + " " + e.name),
       pantry: isPantryStaple(e.key),
       dishes: [...e.dishes],
@@ -434,7 +440,7 @@ const FAMILIES = {
   greens: ["spinach", "lettuce", "cabbage", "kale", "bok choy"],
 };
 
-function haveCovers(have, need) {
+export function haveCovers(have, need) {
   if (have === need) return true;
   const hw = have.split(" ");
   const nw = need.split(" ");
@@ -478,4 +484,207 @@ export function whatCanIMake(dishes, haveList) {
     if (have) out.push({ dish, missing, have, need: need.size });
   }
   return out.sort((a, b) => a.missing.length - b.missing.length || b.have - a.have || a.dish.name.localeCompare(b.dish.name));
+}
+
+// ---------- Healthier, milder or spicier, and metric ----------
+
+// Each swap: what it finds in a line, lines it leaves alone, and how it rewrites them.
+// label is the short name the dish page shows ("brown rice").
+const HEALTHY_SWAPS = [
+  {
+    label: "brown rice",
+    find: /\b(?:white\s+)?((?:short|long|medium)[- ]grain\s+)?rice\b(?!\s*(?:cakes?|paper|vinegar|wine|noodles?|flour|syrup|cereal|krispies|balls?|seasoning))/i,
+    keep: /\bbrown\b|multigrain|sushi|glutinous|sweet rice|tteok|\bmochi/i,
+    to: (m, grain = "") => `${grain}brown rice`,
+    tip: "Brown rice takes longer (about 45 minutes), so start it first. Half white, half brown is a good first step.",
+  },
+  {
+    label: "low-sodium soy sauce",
+    find: /\b(?:regular\s+)?soy sauce\b/i,
+    keep: /low[- ]sodium|reduced[- ]sodium|less[- ]sodium|lite|soup soy|dark soy/i,
+    to: () => "low-sodium soy sauce",
+  },
+  {
+    label: "whole-wheat pasta",
+    find: /\b(elbow macaroni|macaroni|spaghetti|penne|fettuccine|linguine|rotini|fusilli|ditalini|lasagna noodles|pasta)\b/i,
+    keep: /whole[- ]?(wheat|grain)|pasta sauce|pasta water|gluten|rice noodle|fresh pasta/i,
+    to: (m) => `whole-wheat ${m}`,
+  },
+  {
+    label: "whole-wheat bread",
+    find: /\b(white bread|sandwich bread|bread|brioche buns|hamburger buns|burger buns|hot dog buns|buns|flour tortillas|tortillas|pitas?|pizza dough|bagels?|english muffins?)\b/i,
+    keep: /whole[- ]?(wheat|grain)|crumb|corn tortilla|rice paper|naan|banana bread|bread flour|bread dough/i,
+    to: (m) => `whole-wheat ${m.replace(/^(white|brioche)\s+/i, "")}`,
+  },
+  { label: "lean ground meat", find: /\bground (beef|pork)\b/i, keep: /\blean\b|\d+\/\d+\s*%?\s*lean/i, to: (m, meat) => `lean ground ${meat}` },
+  { label: "light mayo", find: /\b(kewpie mayonnaise|kewpie mayo|kewpie|mayonnaise|mayo)\b/i, keep: /light|greek|yogurt|sriracha mayo/i, to: () => "light mayo (or half plain Greek yogurt)" },
+  { label: "Greek yogurt", find: /\bsour cream\b/i, keep: /yogurt/i, to: () => "plain Greek yogurt" },
+  { label: "half-and-half", find: /\b(heavy whipping cream|heavy cream|whipping cream|double cream)\b/i, keep: /half-and-half/i, to: () => "half-and-half" },
+  { label: "Spam Lite", find: /\bspam\b/i, keep: /lite|less sodium|25%/i, to: () => "Spam Lite (less salt)" },
+  { label: "chicken hot dogs", find: /\b(hot dogs?|frankfurters?|vienna sausages?|sausages?)\b/i, keep: /chicken|turkey|plant|veggie|italian sausage|breakfast sausage/i, to: (m) => `chicken ${m}` },
+  { label: "turkey bacon", find: /\bbacon\b/i, keep: /turkey/i, to: () => "turkey bacon" },
+];
+
+// Sweet things get halved instead of swapped.
+const SWEET = /^(sugar|white sugar|granulated sugar|brown sugar|light brown sugar|honey|corn syrup|rice syrup|maple syrup|oligodang|agave|oligo syrup)$/;
+const DEEP_FRY = /\bfor (deep[- ])?frying\b|\bdeep[- ]fry/i;
+const RAMEN = /\b(instant ramen|ramyeon|ramen noodles?|ramen)\b/i;
+
+/**
+ * A healthier version of one ingredient line, or null if it's fine as is.
+ * Returns { line, label, tip? }.
+ */
+export function healthierLine(line) {
+  const p = parseIngredient(line);
+  if (p.header || !p.item) return null;
+  if (DEEP_FRY.test(line) && /\boil\b/i.test(p.item)) {
+    return { line: "2 tbsp oil (air-fry or bake instead of deep-frying)", label: "air-fried", tip: "Air-fry at 400°F for about 15 to 20 minutes, turning once, instead of deep-frying. Or bake at 425°F on a rack." };
+  }
+  if (p.qty != null && SWEET.test(normalizeItemName(p.item))) {
+    return { line: `${scaleIngredient(line, 0.5)} (half the usual)`, label: "less sugar" };
+  }
+  if (RAMEN.test(p.item) && !/seasoning|half/i.test(line)) {
+    return { line: `${line} (use half the seasoning packet)`, label: "half the ramen seasoning" };
+  }
+  for (const swap of HEALTHY_SWAPS) {
+    if (swap.keep.test(line)) continue;
+    const m = line.match(swap.find);
+    if (!m) continue;
+    return { line: line.slice(0, m.index) + swap.to(m[0], m[1]) + line.slice(m.index + m[0].length), label: swap.label, tip: swap.tip };
+  }
+  return null;
+}
+
+// Hot things: chili flakes, fresh chilies, hot sauces. Gochujang is also sweet and
+// savory, so mild halves it instead of leaving it out.
+const CHILI = /\b(gochugaru|korean (?:red )?(?:chili|chile|pepper) (?:flakes|powder)|red pepper flakes|chili flakes|chile flakes|crushed red pepper|cayenne|jalape(?:ñ|n)os?|serranos?|thai chil(?:i|e)s?|bird'?s eye chil(?:i|e)s?|green chil(?:i|e)s?|red chil(?:i|e)s?|chil(?:i|e) peppers?|cheongyang|sriracha|chili oil|chili crisp|hot sauce|buldak sauce|gochujang)\b/i;
+const NOT_HOT = /sweet chil|chili powder|bell pepper|paprika/i;
+
+export const SPICE_LEVELS = [
+  { key: "mild", label: "Mild", emoji: "😊" },
+  { key: "medium", label: "Medium", emoji: "🌶️" },
+  { key: "spicy", label: "Spicy", emoji: "🔥" },
+];
+
+export function isChiliLine(line) {
+  return CHILI.test(String(line || "")) && !NOT_HOT.test(String(line || ""));
+}
+
+/** One line at a spice level: { line, off } where off means "leave it out". */
+export function spiceLine(line, level) {
+  if (level === "medium" || !isChiliLine(line)) return { line, off: false };
+  const p = parseIngredient(line);
+  if (level === "spicy") return { line: p.qty != null ? `${scaleIngredient(line, 1.5)} (extra for spice lovers)` : line, off: false };
+  if (/gochujang/i.test(p.item)) return { line: p.qty != null ? `${scaleIngredient(line, 0.5)} (half for mild)` : line, off: false };
+  return { line, off: true };
+}
+
+const SAVORY_MEALS = /\b(korean|meat|rice|noodles|soup|seafood|veggie)\b/;
+
+/**
+ * A dish's ingredients the way this family cooks it: healthier swaps, spice
+ * level. Returns { lines: [{ line, was, label, off }], swaps: [labels], tips: [text] }.
+ * Lines keep their order (headers included) so the dish page and shopping list agree.
+ */
+export function cookedLines(dish, { healthy = false, spice = "medium" } = {}) {
+  const lines = [];
+  const swaps = [];
+  const tips = [];
+  let hasChili = false;
+  for (const raw of dish?.ingredients || []) {
+    let entry = { line: raw, was: "", label: "", off: false };
+    if (isChiliLine(raw)) hasChili = true;
+    if (healthy) {
+      const better = healthierLine(raw);
+      if (better) {
+        entry = { ...entry, line: better.line, was: raw, label: better.label };
+        if (!swaps.includes(better.label)) swaps.push(better.label);
+        if (better.tip && !tips.includes(better.tip)) tips.push(better.tip);
+      }
+    }
+    const s = spiceLine(entry.line, spice);
+    if (s.off) entry = { ...entry, off: true, label: entry.label || "skip for mild" };
+    else if (s.line !== entry.line) entry = { ...entry, line: s.line, was: entry.was || raw };
+    lines.push(entry);
+  }
+  if (healthy && dish?.healthyTip) tips.unshift(dish.healthyTip);
+  const savory = SAVORY_MEALS.test((dish?.categories || []).join(" ")) && !(dish?.categories || []).includes("treat");
+  if (hasChili && spice === "mild") tips.push("Mild: the hot things are left out. Put chili flakes or gochujang on the table for anyone who wants heat.");
+  if (hasChili && spice !== "mild") tips.push("Someone likes it mild? Scoop out their share before the chili goes in.");
+  if (!hasChili && spice === "spicy" && savory) tips.push("Spice lovers: add gochujang, chili crisp or gochugaru at the table.");
+  return { lines, swaps, tips };
+}
+
+// ---------- Metric ----------
+
+// Grams in a cup for things people weigh. Everything else in cups becomes ml.
+const GRAMS_PER_CUP = [
+  [/\bbrown sugar\b/, 220], [/\b(powdered|icing|confectioners'?) sugar\b/, 120], [/\bsugar\b/, 200],
+  [/\bflour\b/, 125], [/\bcooked\b.*\brice\b|\brice\b.*\bcooked\b/, 160],
+  [/\brice\b(?!\s*(vinegar|wine|cakes?|paper|noodles?|flour|syrup))/, 190],
+  [/\boats\b/, 90], [/\bpanko\b/, 50], [/\bbread ?crumbs\b/, 110], [/\bbutter\b/, 227],
+  [/\bparmesan\b/, 90], [/\b(mozzarella|cheddar|shredded cheese|grated cheese|cheese)\b/, 100],
+  [/\bchocolate chips\b/, 170], [/\bcocoa\b/, 85],
+];
+
+function metricAmount(n, base) {
+  if (base === "g") return n >= 1000 ? `${formatQty(n / 1000, "kg")} kg` : `${formatQty(n, "g")} g`;
+  return n >= 1000 ? `${formatQty(n / 1000, "l")} l` : `${formatQty(n, "ml")} ml`;
+}
+
+const C = (f) => (f - 32) * 5 / 9;
+
+/** Changes °F, inches, ounces and pounds inside any text (steps, notes). */
+export function metricText(text) {
+  return String(text ?? "")
+    .replace(/(\d{2,3})\s*(?:°\s*F\b|degrees\s+F(?:ahrenheit)?\b)/gi, (m, f) => {
+      const c = C(Number(f));
+      return `${f >= 250 ? Math.round(c / 10) * 10 : Math.round(c)}°C`;
+    })
+    .replace(/(\d+)\s*[x×]\s*(\d+)[- ]inch(?:es)?\b/gi, (m, a, b) => `${Math.round(a * 2.54)} x ${Math.round(b * 2.54)} cm`)
+    .replace(new RegExp(`(${NUMBER})(?:\\s*-\\s*|\\s+)(?:inch(?:es)?|in\\.)(?=[\\s,.)]|$)`, "g"), (m, n) => {
+      const cm = parseNumber(n) * 2.54;
+      if (cm == null || !isFinite(cm)) return m;
+      // ¼ inch ≈ ½ cm, ½ inch ≈ 1 cm, 1 inch ≈ 2½ cm, then whole cm.
+      return `${cm < 0.9 ? 0.5 : cm < 2 ? 1 : cm < 3 ? 2.5 : Math.round(cm)} cm`;
+    })
+    .replace(new RegExp(`(${NUMBER})\\s*(?:-\\s*)?(oz|ounces?|lbs?|pounds?)\\b(?!\\.?\\s*fl)`, "gi"), (m, n, unit) => {
+      const v = parseNumber(n);
+      if (v == null) return m;
+      const g = v * (/^(lb|pound)/i.test(unit) ? 453.592 : 28.3495);
+      return metricAmount(g, "g");
+    });
+}
+
+/** One ingredient line in metric: cups to ml (or grams for flour, sugar, rice…), pounds and ounces to grams. */
+export function toMetric(line) {
+  const p = parseIngredient(line);
+  if (p.header || p.qty == null || !p.unit) return metricText(line);
+  const unit = UNIT_BY_KEY[p.unit];
+  const rest = `${p.item}${p.note ? `, ${p.note}` : ""}`;
+  const range = (f) => {
+    const lo = p.qty * f;
+    const hi = p.qtyMax != null ? p.qtyMax * f : null;
+    return { lo, hi };
+  };
+  if (unit.kind === "weight" && (p.unit === "oz" || p.unit === "lb")) {
+    const { lo, hi } = range(unit.factor);
+    const base = metricAmount(hi ?? lo, "g").split(" ")[1];
+    const scale = base === "kg" ? 1000 : 1;
+    const text = hi != null ? `${formatQty(lo / scale, base)}–${formatQty(hi / scale, base)} ${base}` : metricAmount(lo, "g");
+    return `${text} ${metricText(rest)}`;
+  }
+  if (unit.kind === "volume" && !["tsp", "tbsp", "ml", "l"].includes(p.unit)) {
+    const name = normalizeItemName(p.item) + " " + p.item.toLowerCase();
+    const cups = (v) => (v * unit.factor) / 48;
+    const grams = GRAMS_PER_CUP.find(([re]) => re.test(name))?.[1];
+    const per = grams ?? 240;
+    const base = grams ? "g" : "ml";
+    const { lo, hi } = range(1);
+    const text = hi != null
+      ? `${formatQty(cups(lo) * per, base)}–${metricAmount(cups(hi) * per, base)}`
+      : metricAmount(cups(lo) * per, base);
+    return `${text} ${metricText(rest)}`;
+  }
+  return metricText(line);
 }

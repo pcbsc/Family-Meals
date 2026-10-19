@@ -9,8 +9,9 @@ import { viewMenu, viewDiscover } from "./views/menu.js";
 import { viewDish, viewCook } from "./views/dish.js";
 import { viewAdd, viewEdit } from "./views/add.js";
 import { viewShop } from "./views/shop.js";
-import { viewSettings, viewWelcome } from "./views/settings.js";
+import { viewSettings, viewWelcome, viewJoin } from "./views/settings.js";
 import { viewFridge } from "./views/fridge.js";
+import { viewStickers } from "./views/stickers.js";
 
 // full: hides the tab bar. still: background refreshes don't redraw it (so
 // cook-along keeps its place when a rating sheet closes).
@@ -28,6 +29,8 @@ const ROUTES = [
   { re: /^\/shop$/, view: viewShop, tab: "shop" },
   { re: /^\/settings$/, view: viewSettings, tab: "today" },
   { re: /^\/welcome$/, view: viewWelcome, full: true, still: true },
+  { re: /^\/join$/, view: viewJoin, full: true, still: true },
+  { re: /^\/stickers$/, view: viewStickers, tab: "today" },
 ];
 
 const scrollMemory = new Map();
@@ -51,7 +54,8 @@ function errorScreen(err) {
 async function render({ keepScroll = false } = {}) {
   const raw = location.hash.replace(/^#/, "") || "/today";
   const [path, query = ""] = raw.split("?");
-  if (!state.settings.onboarded && path !== "/welcome") return go("#/welcome", { replace: true });
+  // A join link works on a brand-new phone too.
+  if (!state.settings.onboarded && path !== "/welcome" && path !== "/join") return go("#/welcome", { replace: true });
   const route = ROUTES.find((r) => r.re.test(path)) || ROUTES[0];
   if (keepScroll && route === currentRoute && route.still) return;
 

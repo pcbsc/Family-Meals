@@ -13,7 +13,7 @@ export default [
         requestAnimationFrame: "readonly", matchMedia: "readonly", createImageBitmap: "readonly", AudioContext: "readonly",
         speechSynthesis: "readonly", SpeechSynthesisUtterance: "readonly", AbortController: "readonly", Node: "readonly",
         btoa: "readonly", console: "readonly", process: "readonly", structuredClone: "readonly", Uint8Array: "readonly",
-        Uint32Array: "readonly", Event: "readonly",
+        Uint32Array: "readonly", Event: "readonly", TextEncoder: "readonly", File: "readonly",
       },
     },
     rules: {

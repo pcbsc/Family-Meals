@@ -129,6 +129,65 @@ async function enterPin(pin) {
   for (const d of pin) await page.locator(".pin-key", { hasText: d }).first().click();
 }
 
+// ---------- Fake Firebase (for the shared shopping list) ----------
+
+// One in-memory Firestore document per family, with the REST API's updateMask rules.
+const firestore = new Map();
+const fbCalls = [];
+function setPath(fields, path, value) {
+  const [head, ...rest] = path;
+  if (!rest.length) {
+    if (value === undefined) delete fields[head];
+    else fields[head] = value;
+    return;
+  }
+  const node = fields[head]?.mapValue ? fields[head] : (fields[head] = { mapValue: { fields: {} } });
+  node.mapValue.fields ||= {};
+  setPath(node.mapValue.fields, rest, value);
+}
+function getPath(fields, path) {
+  let node = { mapValue: { fields } };
+  for (const part of path) node = node?.mapValue?.fields?.[part];
+  return node;
+}
+let fbTime = 0;
+async function setupFirebase(ctx) {
+  const json = (route, status, body) => route.fulfill({ status, headers: { ...CORS, "content-type": "application/json" }, body: JSON.stringify(body) });
+  await ctx.route("https://identitytoolkit.googleapis.com/**", (route) => (route.request().method() === "OPTIONS"
+    ? route.fulfill({ status: 204, headers: CORS })
+    : json(route, 200, { idToken: "id-token", refreshToken: "refresh-token", expiresIn: "3600", localId: "u1" })));
+  await ctx.route("https://securetoken.googleapis.com/**", (route) => (route.request().method() === "OPTIONS"
+    ? route.fulfill({ status: 204, headers: CORS })
+    : json(route, 200, { id_token: "id-token-2", refresh_token: "refresh-token", expires_in: "3600" })));
+  await ctx.route("https://firestore.googleapis.com/**", async (route) => {
+    const req = route.request();
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS });
+    const url = new URL(req.url());
+    const name = decodeURIComponent(url.pathname.replace(/^\/v1\//, ""));
+    fbCalls.push({ method: req.method(), name, auth: req.headers().authorization, mask: url.searchParams.getAll("updateMask.fieldPaths") });
+    if (!/^projects\/test-family-menu\/databases\/\(default\)\/documents\/families\/[A-Za-z0-9]{24,}$/.test(name)) return json(route, 403, { error: { message: "denied" } });
+    if (req.method() === "GET") {
+      const doc = firestore.get(name);
+      return doc ? json(route, 200, doc) : json(route, 404, { error: { message: "not found" } });
+    }
+    if (req.method() === "PATCH") {
+      const exists = firestore.has(name);
+      if (url.searchParams.get("currentDocument.exists") === "false" && exists) return json(route, 409, { error: { message: "exists" } });
+      const doc = firestore.get(name) || { name, fields: {} };
+      const body = JSON.parse(req.postData());
+      for (const path of url.searchParams.getAll("updateMask.fieldPaths")) {
+        const parts = path.split(".");
+        setPath(doc.fields, parts, getPath(body.fields, parts));
+      }
+      doc.updateTime = `2026-01-01T00:00:${String(++fbTime).padStart(2, "0")}Z`;
+      firestore.set(name, doc);
+      return json(route, 200, doc);
+    }
+    return json(route, 400, { error: { message: "bad request" } });
+  });
+}
+await setupFirebase(context);
+
 // ---------- The walk-through ----------
 
 await check("first run sets up the family and the starter menu", async () => {
@@ -206,9 +265,11 @@ await check("Discover has trending, Korean and American ideas, with what testers
   await page.getByText("worth the hype").first().waitFor();
   // The salmon bowl is already a starter with the same TikTok.
   await page.locator(".discover-item", { hasText: "Salmon Rice Bowl" }).getByText("In menu").waitFor();
-  await page.locator(".kind", { hasText: "Korean" }).click();
+  await page.locator(".kind[data-kind=korean]").click();
   await page.getByRole("heading", { name: "Seonkyoung Longest" }).waitFor();
   await page.getByText("Jjajangmyeon").first().waitFor();
+  await page.locator(".kind[data-kind=fusion]").click();
+  await page.getByText("Bulgogi Taco Bar").waitFor();
   await page.locator(".kind", { hasText: "Italian" }).click();
   await page.getByText("Flatbread Pizza").waitFor();
   await page.locator(".kind", { hasText: "American" }).click();
@@ -251,7 +312,7 @@ await check("cook-along keeps the video on screen while the steps change", async
 });
 
 await check("a grown-up can paste a video link onto any dish, and take it off", async () => {
-  await page.goto(BASE + "#/dish/seed-gamja-jorim");
+  await page.goto(BASE + "#/dish/seed-tteokbokki");
   await page.getByText("📺 Add a video").click();
   await sheet().getByLabel("Video link").fill("https://seonkyounglongest.com/bulgogi/");
   await sheet().getByText("Save this video").click();
@@ -319,8 +380,8 @@ await check("Claude key is saved and tested", async () => {
 });
 
 await check("settings text boxes show what's saved", async () => {
-  const notes = page.getByPlaceholder("No peanuts. Kids like mild food. Dad doesn't eat mushrooms.");
-  assert.equal(await notes.inputValue(), "Kids like mild (not spicy) food.");
+  const notes = page.getByPlaceholder("No peanuts. Our 7-year-old likes spicy food. Dad doesn't eat mushrooms.");
+  assert.match(await notes.inputValue(), /7-year-old loves spicy food/);
 });
 
 await check("Claude finds a video, and only one its search really found", async () => {
@@ -336,7 +397,7 @@ await check("Claude finds a video, and only one its search really found", async 
       { type: "tool_use", id: "toolu_v1", name: "save_video", input: { found: true, url: "https://www.youtube.com/watch?v=MadeUpVid01", channel: "Nobody", problem: "" } },
     ], "tool_use")
     : sse([{ type: "tool_use", id: "toolu_v2", name: "save_video", input: { found: true, url: "https://www.youtube.com/watch?v=i1djfV9uigc", channel: "Maangchi", problem: "" } }], "tool_use");
-  await page.goto(BASE + "#/dish/seed-hobak-jeon");
+  await page.goto(BASE + "#/dish/seed-ants-on-a-log");
   await page.getByText("📺 Add a video").click();
   await sheet().getByText("Find one for me").click();
   await page.getByText("Found one from Maangchi!").waitFor();
@@ -734,6 +795,242 @@ await check("a forgotten PIN can be reset by a grown-up", async () => {
   await page.locator(".pin-answer").fill(String(a * b + c));
   await page.getByText("Reset the PIN").click();
   await page.getByText("No PIN yet").waitFor();
+});
+
+// ---------- Easy changes, cooking our way, Brave Bites, sharing ----------
+
+const nextWeek = await page.evaluate(async () => {
+  const { weekStart, addDays, dateKey } = await import("./js/planner.js");
+  const { state } = await import("./js/store.js");
+  const start = addDays(weekStart(new Date(), state.settings.weekStartsOn), 7);
+  return { start: dateKey(start), mon: dateKey(addDays(start, 1)), tue: dateKey(addDays(start, 2)), wed: dateKey(addDays(start, 3)) };
+});
+const slotOf = (key, meal) => page.evaluate(async ([k, m]) => {
+  const { getSlot } = await import("./js/store.js");
+  return getSlot(k, m) || null;
+}, [key, meal]);
+const openSpot = (key, meal) => page.evaluate(async ([k, m]) => (await import("./js/views/week.js")).slotSheet(k, m), [key, meal]);
+
+await check("one tap tries something else for a meal, and Undo puts it back", async () => {
+  await page.goto(BASE + `#/week?w=${nextWeek.start}`);
+  await page.evaluate(async (k) => (await import("./js/store.js")).setSlotDishes(k, "dinner", ["seed-bulgogi"]), nextWeek.mon);
+  await openSpot(nextWeek.mon, "dinner");
+  const ideas = sheet().locator(".idea");
+  await ideas.first().waitFor();
+  assert.equal(await ideas.count(), 4);
+  const first = await ideas.first().getAttribute("aria-label");
+  await sheet().getByText("🎲 More ideas").click();
+  await page.waitForTimeout(100);
+  assert.notEqual(await sheet().locator(".idea").first().getAttribute("aria-label"), first, "new ideas");
+  await sheet().locator(".idea").first().click();
+  await page.locator(".toast", { hasText: "Swapped for" }).waitFor();
+  assert.notEqual((await slotOf(nextWeek.mon, "dinner")).items[0].dishId, "seed-bulgogi");
+  await page.locator(".toast-action", { hasText: "Undo" }).click();
+  await page.waitForFunction(async (k) => (await import("./js/store.js")).getSlot(k, "dinner")?.items[0]?.dishId === "seed-bulgogi", nextWeek.mon);
+  await closeSheets();
+});
+
+await check("a meal moves to another day (swapping with what's there), and Undo works", async () => {
+  await page.evaluate(async (k) => (await import("./js/store.js")).setSlotDishes(k, "dinner", ["seed-japchae"]), nextWeek.wed);
+  await openSpot(nextWeek.mon, "dinner");
+  await sheet().getByRole("button", { name: /^Wed/ }).click();
+  await page.locator(".toast", { hasText: "Moved to Wednesday" }).waitFor();
+  assert.equal((await slotOf(nextWeek.wed, "dinner")).items[0].dishId, "seed-bulgogi");
+  assert.equal((await slotOf(nextWeek.mon, "dinner")).items[0].dishId, "seed-japchae", "the two days swapped");
+  await page.locator(".toast-action", { hasText: "Undo" }).click();
+  await page.waitForFunction(async (k) => (await import("./js/store.js")).getSlot(k, "dinner")?.items[0]?.dishId === "seed-bulgogi", nextWeek.mon);
+  assert.equal((await slotOf(nextWeek.wed, "dinner")).items[0].dishId, "seed-japchae");
+});
+
+await check("make extra tonight: tomorrow's lunch is leftovers, and the list doesn't buy it twice", async () => {
+  await page.evaluate(async (k) => (await import("./js/store.js")).setSlotDishes(k, "lunch", []), nextWeek.tue);
+  await openSpot(nextWeek.mon, "dinner");
+  await sheet().getByText("🍱 Make extra for lunch tomorrow").click();
+  await page.locator(".toast", { hasText: "Cooking double" }).waitFor();
+  await closeSheets();
+  const dinner = await slotOf(nextWeek.mon, "dinner");
+  const lunch = await slotOf(nextWeek.tue, "lunch");
+  assert.equal(lunch.items[0].dishId, "seed-bulgogi");
+  assert.equal(lunch.items[0].leftover, true);
+  assert.equal(dinner.items[0].servings, lunch.items[0].servings * 2, "tonight's dinner is doubled");
+  await page.locator(".slot-names", { hasText: "Beef Bulgogi 🍱" }).waitFor();
+  await page.goto(BASE + `#/shop?w=${nextWeek.start}`);
+  await page.locator(".list-for .chip", { hasText: "Beef Bulgogi" }).waitFor();
+  assert.equal(await page.locator(".list-for .chip", { hasText: "Beef Bulgogi ×" }).count(), 0, "the leftovers lunch isn't shopped for");
+});
+
+await check("freezer meals: freeze after cooking, plan one, nothing to buy", async () => {
+  await page.goto(BASE + "#/cook/seed-japchae?s=4");
+  const steps = STARTER_DISHES.find((d) => d.seedKey === "japchae").steps.length;
+  for (let i = 0; i <= steps; i++) await page.locator(".cook-next").click();
+  await page.getByText("🧊 We froze some for later").click();
+  await page.locator(".toast", { hasText: "in the freezer list" }).waitFor();
+  await page.goto(BASE + "#/fridge");
+  await page.locator(".freezer", { hasText: "Japchae" }).waitFor();
+  await page.evaluate(async (k) => (await import("./js/store.js")).setSlotDishes(k, "dinner", []), nextWeek.tue);
+  await page.goto(BASE + `#/week?w=${nextWeek.start}`);
+  await openSpot(nextWeek.tue, "dinner");
+  await sheet().getByRole("button", { name: /Japchae ×1/ }).click();
+  await page.locator(".toast", { hasText: "from the freezer" }).waitFor();
+  const slot = await slotOf(nextWeek.tue, "dinner");
+  assert.equal(slot.items[0].fromFreezer, true);
+  assert.equal(await page.evaluate(async () => (await import("./js/store.js")).freezer().length), 0, "the last one was used");
+  await closeSheets();
+});
+
+await check("Today has a Change button on each planned meal", async () => {
+  await page.evaluate(async () => {
+    const { setSlotDishes } = await import("./js/store.js");
+    const { dateKey } = await import("./js/planner.js");
+    for (const m of ["breakfast", "lunch", "dinner"]) await setSlotDishes(dateKey(new Date()), m, ["seed-gyeran-mari"]);
+  });
+  await page.goto(BASE + "#/today");
+  await page.locator(".meal-cards").waitFor();
+  await page.getByRole("button", { name: "Change dinner" }).click();
+  await sheet().getByText("Try something else").waitFor();
+  await closeSheets();
+});
+
+await check("Healthy, Mild/Spicy and grams switches change the recipe, steps and list", async () => {
+  await page.goto(BASE + "#/dish/seed-kimchi-fried-rice");
+  await page.locator(".ing", { hasText: "4 cups cooked rice" }).waitFor();
+  await page.locator(".way", { hasText: "🥗 Healthy" }).click();
+  await page.locator(".ing", { hasText: "4 cups cooked brown rice" }).waitFor();
+  await page.locator(".ing", { hasText: "low-sodium soy sauce" }).waitFor();
+  await page.locator(".way-note", { hasText: "brown rice" }).waitFor();
+  await page.locator(".way", { hasText: "Mild" }).click();
+  await page.locator(".ing", { hasText: "(half for mild)" }).waitFor();
+  await page.locator(".way", { hasText: "Spicy" }).click();
+  await page.locator(".ing", { hasText: "extra for spice lovers" }).waitFor();
+  await page.locator(".way", { hasText: "🥄 Cups" }).click();
+  await page.locator(".ing", { hasText: "640 g cooked brown rice" }).waitFor();
+  await page.goto(BASE + "#/dish/seed-gochujang-salmon");
+  await page.locator(".steps li", { hasText: "220°C" }).waitFor();
+  // Switches are saved for the family and the shopping list follows them.
+  await page.goto(BASE + `#/shop?w=${nextWeek.start}`);
+  await page.locator(".list-for", { hasText: "With healthy swaps" }).waitFor();
+  await page.evaluate(async () => (await import("./js/store.js")).saveSettings({ healthy: false, spice: "medium", metric: false }));
+  await page.goto(BASE + "#/dish/seed-gochujang-salmon");
+  await page.locator(".steps li", { hasText: "425°F" }).waitFor();
+});
+
+await check("a recipe card prints without the buttons and tabs", async () => {
+  await page.evaluate(() => (window.print = () => (window.__printed = true)));
+  await page.getByText("🖨️ Print recipe card").click();
+  assert.equal(await page.evaluate(() => window.__printed), true);
+  await page.emulateMedia({ media: "print" });
+  assert.equal(await page.locator(".tabbar").isVisible(), false);
+  assert.equal(await page.locator(".dish-actions").isVisible(), false);
+  assert.equal(await page.locator(".steps").isVisible(), true);
+  await page.emulateMedia({ media: "screen" });
+});
+
+await check("the week's dinners go on the calendar as an .ics file", async () => {
+  await page.goto(BASE + `#/week?w=${nextWeek.start}`);
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), sheet().getByText("📆 Put our dinners on the calendar").click()]);
+  assert.match(download.suggestedFilename(), /^family-menu-dinners-.*\.ics$/);
+  const ics = readFileSync(await download.path(), "utf8");
+  assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
+  assert.match(ics, /SUMMARY:🍽️ Beef Bulgogi/);
+  assert.match(ics, new RegExp(`DTSTART:${nextWeek.mon.replace(/-/g, "")}T180000`));
+  assert.match(ics, /From the freezer/);
+});
+
+await check("Brave Bites: a kid's first taste of a dish earns a sticker", async () => {
+  await page.goto(BASE + "#/dish/seed-dakgangjeong");
+  await page.locator(".action", { hasText: "Rate" }).click();
+  await page.locator("[aria-label='Kiddo: Yummy']").click();
+  await page.locator(".toast", { hasText: "Brave Bite! Kiddo got a" }).waitFor();
+  // Changing the face isn't a new sticker.
+  await page.locator("[aria-label='Kiddo: Love it!']").click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.locator(".toast", { hasText: "Brave Bite!" }).count(), 1);
+  await sheet().getByText("Done").click();
+  await page.goto(BASE + "#/today");
+  await page.locator(".brave").click();
+  await page.locator(".kid-stickers", { hasText: "Kiddo" }).waitFor();
+  await page.locator(".sticker[aria-label*='Sweet Crispy Chicken']").waitFor();
+  await page.getByText("more for a prize").waitFor();
+});
+
+await check("done shopping: ticked things go into what we have, and are set aside next time", async () => {
+  await page.evaluate(async () => (await import("./js/store.js")).saveSettings({ have: [] }));
+  await page.goto(BASE + `#/shop?w=${nextWeek.start}`);
+  const pear = page.locator(".aisle .shop-item", { hasText: "Asian pear" });
+  await pear.waitFor();
+  await pear.locator(".shop-btn").click();
+  await page.getByText("🏠 Done shopping").click();
+  await page.locator(".toast", { hasText: "added to \"what we have\"" }).waitFor();
+  const have = await page.evaluate(async () => (await import("./js/store.js")).state.settings.have);
+  assert.ok(have.some((x) => /pear/.test(x)), have.join(", "));
+  await page.locator(".have-these").click();
+  await page.locator(".have-these .shop-item", { hasText: "Asian pear" }).waitFor();
+  assert.equal(await page.locator(".aisle-produce .shop-item", { hasText: "Asian pear" }).count(), 0);
+  await page.locator(".have-these .shop-item", { hasText: "Asian pear" }).getByText("We need it").click();
+  await page.locator(".aisle-produce .shop-item", { hasText: "Asian pear" }).waitFor();
+});
+
+await check("the shopping list is shared live with a second phone", async () => {
+  // This week's list needs something on it.
+  await page.evaluate(async () => {
+    const { setSlotDishes } = await import("./js/store.js");
+    const { dateKey } = await import("./js/planner.js");
+    await setSlotDishes(dateKey(new Date()), "dinner", ["seed-bulgogi-tacos"]);
+  });
+  await page.goto(BASE + "#/settings");
+  if (await page.getByText("Grown-ups only").count()) await enterPin("1234");
+  await page.getByLabel("Web API key").fill("AIzaSyD-abcdefghijklmnopqrstuvwxyz012");
+  await page.getByLabel("Project ID").fill("test-family-menu");
+  await page.getByText("📱 Start sharing").click();
+  const link = await page.getByLabel("Join link").inputValue();
+  assert.match(link, /#\/join\?k=AIza.*&p=test-family-menu&f=[A-Za-z0-9]{32}$/);
+  assert.ok(fbCalls.some((c) => c.method === "PATCH" && c.auth === "Bearer id-token"), "signed in and made the list");
+
+  await page.locator(".tabbar a[data-tab=shop]").click();
+  await page.locator(".share-note", { hasText: "Shared with the family" }).waitFor();
+  // The planning phone publishes the list.
+  for (let i = 0; i < 50 && ![...firestore.values()][0]?.fields?.items?.arrayValue?.values?.length; i++) await page.waitForTimeout(100);
+
+  const ctx2 = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, serviceWorkers: "block" });
+  await setupFirebase(ctx2);
+  const phone = await ctx2.newPage();
+  phone.on("pageerror", (e) => errors.push(`second phone: ${e.message}`));
+  await phone.goto(link.replace(/^.*#/, BASE + "#"));
+  await phone.getByText("Join the family shopping list?").waitFor();
+  await phone.getByText("✅ Join").click();
+  // A brand-new phone sets itself up next; the list stays joined.
+  await phone.getByText("Welcome to Family Menu!").waitFor();
+  await phone.getByRole("button", { name: /Let's set up/ }).click();
+  await phone.getByText("Next ▶").click();
+  await phone.getByText("No thanks").click();
+  await phone.locator(".tabbar a[data-tab=shop]").click();
+  await phone.locator(".share-note", { hasText: "Shared list" }).waitFor();
+  const tortillas = phone.locator(".shop-item", { hasText: "Flour tortillas" });
+  await tortillas.waitFor();
+
+  // A tick on the second phone shows on the first, and an extra from the first shows on the second.
+  await tortillas.locator(".shop-btn").click();
+  await page.locator(".shop-item.done", { hasText: "Flour tortillas" }).waitFor({ timeout: 10000 });
+  await page.getByLabel("Add something to the list").fill("Paper towels");
+  await page.getByLabel("Add something to the list").press("Enter");
+  await phone.locator(".shop-item", { hasText: "Paper towels" }).waitFor({ timeout: 10000 });
+  // Done shopping on the second phone puts what was bought in the first phone's "what we have".
+  await phone.getByText("🏠 Done shopping").click();
+  await page.waitForFunction(async () => (await import("./js/store.js")).state.settings.have?.some((x) => /tortilla/.test(x)), null, { timeout: 10000 });
+  await page.locator(".have-these", { hasText: "Flour tortillas" }).waitFor({ timeout: 10000 });
+  await ctx2.close();
+
+  await page.goto(BASE + "#/settings");
+  if (await page.getByText("Grown-ups only").count()) await enterPin("1234");
+  await page.getByText("Stop sharing").click();
+  await sheet().getByRole("button", { name: "Stop sharing", exact: true }).click();
+  await page.getByText("📱 Start sharing").waitFor();
+});
+
+await check("a broken join link is refused", async () => {
+  await page.goto(BASE + "#/join?k=x&p=y&f=z");
+  await page.getByText("This join link looks broken").waitFor();
 });
 
 await check("no errors in the console", async () => {

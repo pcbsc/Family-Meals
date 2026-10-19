@@ -1,9 +1,10 @@
 // What can we make? Tap or type what's in the fridge, and see which dishes are
 // ready to cook and which need just a thing or two (those go on the list).
+// The freezer list is here too: meals we froze for a busy night.
 import { h, clearChildren, toast } from "../ui.js";
 import { whatCanIMake, keyIngredients, normalizeItemName } from "../recipe.js";
-import { state, dishList, saveSettings, go, addShoppingExtras } from "../store.js";
-import { backHeader, dishTile, dishArt } from "../components.js";
+import { state, dishList, saveSettings, go, addShoppingExtras, freezer, addToFreezer, takeFromFreezer } from "../store.js";
+import { backHeader, dishTile, dishArt, planItSheet, pickDishes } from "../components.js";
 
 const COMMON = [
   ["🥚", "eggs"], ["🍚", "rice"], ["🍗", "chicken"], ["🥩", "ground beef"], ["🐷", "pork"], ["🐟", "salmon"],
@@ -104,6 +105,45 @@ export function viewFridge() {
   };
   draw();
 
+  const freezerBox = h("section.card.stack.freezer");
+  const drawFreezer = () => {
+    clearChildren(freezerBox);
+    const frozen = freezer();
+    freezerBox.append(
+      h("h2", "🧊 In the freezer"),
+      frozen.length
+        ? h("div.almost-list", frozen.map((f) => {
+          const dish = state.dishes.get(f.dishId);
+          return h("div.almost",
+            h("button.almost-dish", { onclick: () => planItSheet(dish) },
+              dishArt(dish, { className: "art-sm" }),
+              h("span.grow", h("strong", dish.name), h("span.muted.block", `${f.meals} meal${f.meals === 1 ? "" : "s"} · tap to plan it`)),
+            ),
+            h("button.icon-btn", {
+              "aria-label": `We ate one ${dish.name}`,
+              onclick: async () => { await takeFromFreezer(dish.id); drawFreezer(); },
+            }, "−"),
+            h("button.icon-btn", {
+              "aria-label": `One more ${dish.name}`,
+              onclick: async () => { await addToFreezer(dish.id); drawFreezer(); },
+            }, "+"),
+          );
+        }))
+        : h("p.muted", "Nothing yet. Cook double and freeze half for a busy night!"),
+      h("button.btn.soft", {
+        onclick: () => pickDishes({
+          title: "🧊 What did we freeze?",
+          onPick: async (ids) => {
+            for (const id of ids) await addToFreezer(id);
+            toast("In the freezer list!", { emoji: "🧊" });
+            drawFreezer();
+          },
+        }),
+      }, "➕ We froze something"),
+    );
+  };
+  drawFreezer();
+
   return h("div.screen.fridge",
     backHeader("🧊 What can we make?", { back: "#/menu" }),
     h("section.card.stack",
@@ -115,5 +155,6 @@ export function viewFridge() {
       have.length ? h("button.btn.ghost.center-btn", { onclick: () => keep([]) }, "Start over") : null,
     ),
     results,
+    freezerBox,
   );
 }

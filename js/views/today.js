@@ -2,8 +2,17 @@
 // dinner" game when a grown-up set choices, "how was last night?", and wishes.
 import { h, confetti, toast, prettyDate, once } from "../ui.js";
 import { dateKey, addDays } from "../planner.js";
-import { state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, go, refresh, saveSettings } from "../store.js";
+import {
+  state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, go, refresh, saveSettings, members, stickersFor,
+} from "../store.js";
 import { grownUp, dishArt, dishTile, rateSheet, wishFlow, pickDishes } from "../components.js";
+import { slotSheet } from "./week.js";
+
+/** The little "change it" button on a planned meal: swap, move, leftovers… */
+const changeBtn = (date, meal, big = false) => h(`button.change-btn${big ? ".big" : ""}`, {
+  "aria-label": `Change ${meal.label.toLowerCase()}`,
+  onclick: () => slotSheet(dateKey(date), meal.key),
+}, big ? "🔄 Change" : "🔄");
 
 function pickFor(date, meal) {
   pickDishes({
@@ -31,13 +40,19 @@ function mealCard(date, meal) {
     );
   }
   const [first] = items;
-  return h("button.meal-card.photo", { style: { "--meal": meal.color }, onclick: () => go(`#/dish/${first.dish.id}`) },
-    dishArt(first.dish, { kind: "full", className: "art-meal" }),
-    h("span.meal-overlay",
-      h("span.meal-label", meal.emoji, " ", meal.label),
-      h("span.meal-name", first.dish.name),
-      items.length > 1 ? h("span.meal-more", "with " + items.slice(1).map((i) => i.dish.name).join(", ")) : null,
+  const badge = first.leftover ? "🍱 Leftovers · " : first.fromFreezer ? "🧊 From the freezer · " : "";
+  return h("div.meal-card-wrap",
+    h("button.meal-card.photo", { style: { "--meal": meal.color }, onclick: () => go(`#/dish/${first.dish.id}`) },
+      dishArt(first.dish, { kind: "full", className: "art-meal" }),
+      h("span.meal-overlay",
+        h("span.meal-label", meal.emoji, " ", meal.label),
+        h("span.meal-name", first.dish.name),
+        badge || items.length > 1
+          ? h("span.meal-more", badge, items.length > 1 ? "with " + items.slice(1).map((i) => i.dish.name).join(", ") : "")
+          : null,
+      ),
     ),
+    changeBtn(date, meal, true),
   );
 }
 
@@ -46,7 +61,7 @@ function mealRow(date, meal) {
   const slot = getSlot(dateKey(date), meal.key);
   const items = slotDishes(slot);
   const kidsChoosing = !items.length && slot?.choices?.length;
-  return h("button.meal-row", {
+  const row = h("button.meal-row", {
     style: { "--meal": meal.color },
     onclick: () => (items.length
       ? go(`#/dish/${items[0].dish.id}`)
@@ -60,6 +75,18 @@ function mealRow(date, meal) {
         : h("span.meal-empty", kidsChoosing ? "🧒 Kids are choosing" : "➕ Pick"),
     ),
     h("span.meal-row-go", { "aria-hidden": "true" }, "›"),
+  );
+  return items.length ? h("div.meal-row-wrap", row, changeBtn(date, meal)) : row;
+}
+
+/** Brave Bites: each kid's sticker count, one tap to the chart. */
+function braveBites() {
+  const kids = members().filter((m) => m.kid);
+  if (!kids.length || !state.dishes.size) return null;
+  return h("button.card.brave", { onclick: () => go("#/stickers") },
+    h("span.brave-emoji", "🏅"),
+    h("span.grow", h("strong", "Brave Bites"), h("span.muted.block", "Try a new food, get a sticker!")),
+    h("span.brave-kids", kids.map((k) => h("span.brave-kid", k.avatar, " ", String(stickersFor(k.id).length)))),
   );
 }
 
@@ -168,6 +195,7 @@ export function viewToday() {
       h("div.meal-rows", meals.filter((m) => m !== upNext).map((m) => mealRow(now, m))),
     ),
     h("button.btn.big.wish.wide", { onclick: () => wishFlow() }, "🙋 I want to eat…"),
+    braveBites(),
     grownUpBanners(),
   );
 }

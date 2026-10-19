@@ -2,6 +2,7 @@
 // this app (home-style versions of classic dishes) so the family has a full
 // menu on day one. Discover links to recipes by well-known cooks; tapping one
 // asks Claude to read that page and add it to the menu on this device.
+import { FUSION_STARTERS } from "./seed-fusion.js";
 
 export const MEALS = [
   { key: "breakfast", label: "Breakfast", emoji: "🌅", color: "#FFE7A3" },
@@ -30,6 +31,7 @@ export const CATEGORIES = [
 // Kinds of food, for the Menu's filter. The flags read well for kids.
 export const CUISINES = [
   { key: "korean", label: "Korean", emoji: "🇰🇷" },
+  { key: "fusion", label: "Korean fusion", emoji: "🌮" },
   { key: "american", label: "American", emoji: "🇺🇸" },
   { key: "italian", label: "Italian", emoji: "🇮🇹" },
   { key: "mexican", label: "Mexican", emoji: "🇲🇽" },
@@ -736,6 +738,50 @@ const STARTER_VIDEOS = {
   "marry-me-chicken": "https://www.tiktok.com/@delish/video/7063524229110566191",
   "cottage-cheese-flatbread": "https://www.tiktok.com/@kalejunkie/video/7371570213797563691",
   "baked-feta-pasta": "https://www.tiktok.com/@grilledcheesesocial/video/6922946148760030469",
+  // Batch 4 and the Korean starters that didn't have one yet.
+  "bulgogi-tacos": "https://www.youtube.com/watch?v=rAxAzHaowyA",
+  "kimchi-quesadilla": "https://www.youtube.com/watch?v=-RldQgx6V9w",
+  "bulgogi-cheesesteak": "https://www.youtube.com/watch?v=xLn8rMO5qkQ",
+  "korean-corn-dogs": "https://www.youtube.com/watch?v=5XcNqkijrzs",
+  "kimchi-mac-and-cheese": "https://www.youtube.com/watch?v=j1qo2KDaTho",
+  "kimchi-grilled-cheese": "https://www.youtube.com/watch?v=PauB8JW_s9E",
+  "gilgeori-toast": "https://www.youtube.com/watch?v=qzZY7oDpdwU",
+  "egg-drop-sandwich": "https://www.youtube.com/watch?v=e4jYOnzr8eU",
+  "bulgogi-burgers": "https://www.youtube.com/watch?v=huysMNDwV7k",
+  "bulgogi-pizza": "https://www.youtube.com/watch?v=Wc4zuP_YXuQ",
+  "gochujang-meatballs": "https://www.youtube.com/watch?v=rvYvkfpwIUM",
+  "gochujang-salmon": "https://www.youtube.com/watch?v=nUs2PGNBLHc",
+  "dakgangjeong": "https://www.youtube.com/watch?v=jSh6VJYRV-g",
+  "gochujang-wings": "https://www.youtube.com/watch?v=BwKQLHPErpo",
+  "budae-jjigae": "https://www.youtube.com/watch?v=euVyBKNfxkk",
+  "rabokki": "https://www.youtube.com/watch?v=1oCGL_HPODQ",
+  "rose-tteokbokki": "https://www.youtube.com/watch?v=fX7D5F0bjX0",
+  "cheese-ramyeon": "https://www.youtube.com/watch?v=QUG6AxFLOz8",
+  "jeyuk-bokkeum": "https://www.youtube.com/watch?v=Ih0YtdaXofA",
+  "dak-bulgogi": "https://www.youtube.com/watch?v=OKqnWg4JtwA",
+  "jjimdak": "https://www.youtube.com/watch?v=UQ0inU9LE4I",
+  "dakdoritang": "https://www.youtube.com/watch?v=T7icxr899qc",
+  "gamja-jeon": "https://www.youtube.com/watch?v=4HPsl36bbIY",
+  "kimchi-jeon": "https://www.youtube.com/watch?v=05SSlcjIsWM",
+  "homemade-mandu": "https://www.youtube.com/watch?v=OGmVfCHszp0",
+  "soegogi-muguk": "https://www.youtube.com/watch?v=NefPocSaeDU",
+  "ssam-night": "https://www.youtube.com/watch?v=HNhIylpsmmA",
+  "bibim-guksu": "https://www.youtube.com/watch?v=8l9_OE9c6vg",
+  "dubu-gangjeong": "https://www.youtube.com/watch?v=rJooANabXpE",
+  "sotteok-sotteok": "https://www.youtube.com/watch?v=KApoL-IBd4k",
+  "goguma-mattang": "https://www.youtube.com/watch?v=-IBGhTSOsJg",
+  "dak-kalguksu": "https://www.youtube.com/watch?v=5Ceg1QN56p0",
+  "beef-bulgogi-bowl": "https://www.youtube.com/watch?v=5YMJqshTBMI",
+  "gamja-jorim": "https://www.youtube.com/watch?v=GZ5ST5XbiIo",
+  "hobak-jeon": "https://www.youtube.com/watch?v=xTiqBDd1eZE",
+  "gyeran-mari": "https://www.youtube.com/watch?v=kN89ewZjOR8",
+  "jumeokbap": "https://www.youtube.com/watch?v=q02C-WeeRss",
+  "gyeran-bap": "https://www.youtube.com/watch?v=VGxhL1iS5kk",
+  "yachae-jeon": "https://www.youtube.com/watch?v=knxgR5esJu4",
+  "goguma": "https://www.youtube.com/watch?v=eaFRLAXnaPc",
+  "tuna-mayo-bowl": "https://www.youtube.com/watch?v=leBxyqUnZbw",
+  "corn-cheese": "https://www.youtube.com/watch?v=iuG2AXehmzw",
+  "hotteok": "https://www.youtube.com/watch?v=R_MPEq53QFs",
 };
 
 // The earlier starters that aren't Korean or American.
@@ -753,12 +799,13 @@ export const STARTER_DISHES = [
   ...FIRST_STARTERS.map((dish) => ({ ...dish, batch: 1 })),
   ...MORE_STARTERS.map((dish) => ({ ...dish, batch: 2 })),
   ...WORLD_STARTERS.map((dish) => ({ ...dish, batch: 3 })),
+  ...FUSION_STARTERS.map((dish) => ({ ...dish, batch: 4 })),
 ].map((dish) => ({
   ...dish,
   cuisine: dish.cuisine || STARTER_CUISINES[dish.seedKey] || (dish.categories.includes("korean") ? "korean" : "american"),
   videoUrl: STARTER_VIDEOS[dish.seedKey] || "",
 }));
-export const LATEST_STARTER_BATCH = 3;
+export const LATEST_STARTER_BATCH = 4;
 
 const CUISINE_KEYS = new Set(CUISINES.map((c) => c.key));
 const SEED_CUISINE = new Map(STARTER_DISHES.map((dish) => [dish.seedKey, dish.cuisine]));
@@ -829,6 +876,38 @@ export const DISCOVER = [
     note: "Went viral after Cardi B showed it on Instagram Live." },
 
   // ---- 🇰🇷 Korean ----
+
+  // ---- 🌮 Korean fusion and 🇰🇷 more Korean family favorites ----
+  { cuisine: "fusion", name: "Bulgogi Taco Bar", nameKo: "", emoji: "🌮", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/bulgogi-taco-bar/", meal: "dinner" },
+  { cuisine: "fusion", name: "Easy Kimchi Quesadillas", nameKo: "", emoji: "🧀", by: "Kimchimari", url: "https://kimchimari.com/easy-kimchi-quesadillas/", meal: "lunch" },
+  { cuisine: "fusion", name: "Korean Cheese Corn Dogs", nameKo: "", emoji: "🌭", by: "Beyond Kimchee", url: "https://www.beyondkimchee.com/korean-corn-dog/", meal: "snack" },
+  { cuisine: "fusion", name: "Kimchi Mac and Cheese", nameKo: "", emoji: "🧀", by: "Judy Joo", url: "https://www.judyjoo.com/recipes/kimchi-mac-and-cheese-42/", meal: "dinner" },
+  { cuisine: "fusion", name: "Korean Tofu Burritos with Kimchi Fried Rice", nameKo: "", emoji: "🌯", by: "Judy Joo", url: "https://www.judyjoo.com/recipes/korean-marinated-tofu-burritos-52/", meal: "lunch" },
+  { cuisine: "fusion", name: "Baked Gochujang Chicken Wings", nameKo: "", emoji: "🍗", by: "Korean Bapsang", url: "https://www.koreanbapsang.com/chicken-wings/", meal: "dinner" },
+  { cuisine: "fusion", name: "Gochujang Salmon with Multigrain Rice", nameKo: "", emoji: "🐟", by: "Judy Joo", url: "https://www.judyjoo.com/recipes/gochujang-salmon-with-multi-grain-rice-84/", meal: "dinner" },
+  { cuisine: "fusion", name: "Bulgogi Rice Burger", nameKo: "", emoji: "🍔", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/bulgogi-rice-burger/", meal: "lunch" },
+  { cuisine: "fusion", name: "Spam Kimbap", nameKo: "", emoji: "🍙", by: "Seonkyoung Longest", url: "https://seonkyounglongest.com/spam-kimbap/", meal: "lunch" },
+  { cuisine: "fusion", name: "Philly-Style Bulgogi Cheesesteak", nameKo: "", emoji: "🥖", by: "Beyond Kimchee", url: "https://www.beyondkimchee.com/bulgogi-cheesesteak/", meal: "dinner" },
+  { cuisine: "fusion", name: "Bulgogi Pizza", nameKo: "", emoji: "🍕", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/bulgogi-pizza/", meal: "dinner" },
+  { cuisine: "fusion", name: "Kimchi Grilled Cheese", nameKo: "", emoji: "🥪", by: "Aaron and Claire", url: "https://aaronandclaire.com/kimchi-grilled-cheese/", meal: "lunch" },
+  { cuisine: "fusion", name: "Korean Fried Chicken Sandwich", nameKo: "", emoji: "🍔", by: "Aaron and Claire", url: "https://aaronandclaire.com/best-korean-fried-chicken-sandwich-recipe/", meal: "dinner" },
+  { cuisine: "korean", name: "Dakgangjeong (Soy Garlic Fried Chicken)", nameKo: "", emoji: "🍗", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/dakgangjeong-soy-garlic-fried-chicken/", meal: "dinner" },
+  { cuisine: "korean", name: "Rosé Tteokbokki", nameKo: "", emoji: "🌸", by: "Aaron and Claire", url: "https://aaronandclaire.com/rose-tteokbokki/", meal: "lunch" },
+  { cuisine: "korean", name: "Easy Rabokki", nameKo: "", emoji: "🍜", by: "Chef Chris Cho", url: "https://chefchrischo.com/rabokki/", meal: "snack" },
+  { cuisine: "korean", name: "Budae Jjigae (Army Base Stew)", nameKo: "", emoji: "🍲", by: "Maangchi", url: "https://www.maangchi.com/recipe/budae-jjigae", meal: "dinner" },
+  { cuisine: "korean", name: "Jjimdak (Braised Chicken)", nameKo: "", emoji: "🍗", by: "Korean Bapsang", url: "https://www.koreanbapsang.com/jjimdakdakjjim-korean-style-braised/", meal: "dinner" },
+  { cuisine: "korean", name: "Gamja Jeon (Crispy Potato Pancakes)", nameKo: "", emoji: "🥔", by: "Kimchimari", url: "https://kimchimari.com/korean-potato-pancakes-gamjajeon/", meal: "snack" },
+  { cuisine: "korean", name: "Classic Mandu (Dumplings)", nameKo: "", emoji: "🥟", by: "Maangchi", url: "https://www.maangchi.com/recipe/classic-mandu", meal: "lunch" },
+  { cuisine: "korean", name: "Sotteok Sotteok (Rice Cake & Sausage Skewers)", nameKo: "", emoji: "🍢", by: "My Korean Kitchen", url: "https://mykoreankitchen.com/sotteok-sotteok/", meal: "snack" },
+  { cuisine: "korean", name: "Goguma Mattang (Candied Sweet Potato)", nameKo: "", emoji: "🍠", by: "Maangchi", url: "https://www.maangchi.com/recipe/mattang", meal: "snack" },
+  { cuisine: "korean", name: "Dak Kalguksu (Chicken Noodle Soup)", nameKo: "", emoji: "🍜", by: "Korean Bapsang", url: "https://www.koreanbapsang.com/dak-kalguksu-chicken-noodle-soup/", meal: "lunch" },
+  { cuisine: "korean", name: "Gyeran Ppang (Egg Bread)", nameKo: "", emoji: "🍞", by: "Beyond Kimchee", url: "https://www.beyondkimchee.com/korean-egg-bread/", meal: "breakfast" },
+  { cuisine: "korean", name: "Gilgeori Toast (Street Toast)", nameKo: "", emoji: "🍞", by: "Korean Bapsang", url: "https://www.koreanbapsang.com/gilgeori-toast-korean-street-toast/", meal: "breakfast" },
+  { cuisine: "korean", name: "Soegogi Muguk (Beef & Radish Soup)", nameKo: "", emoji: "🍲", by: "Maangchi", url: "https://www.maangchi.com/recipe/soegogi-muguk", meal: "breakfast" },
+  { cuisine: "korean", name: "Easy Ground Beef Bibimbap", nameKo: "", emoji: "🥗", by: "Beyond Kimchee", url: "https://www.beyondkimchee.com/bibimbap/", meal: "dinner" },
+  { cuisine: "korean", name: "Dubu Ganjang Jorim (Soy Tofu)", nameKo: "", emoji: "🥢", by: "Maangchi", url: "https://www.maangchi.com/recipe/dubu-ganjangjorim", meal: "dinner" },
+  { cuisine: "korean", name: "Japgokbap (Multigrain Rice)", nameKo: "", emoji: "🍚", by: "Chef Chris Cho", url: "https://chefchrischo.com/korean-multigrain-rice/", meal: "dinner" },
+  { cuisine: "korean", name: "Godeungeo Gui (Grilled Mackerel)", nameKo: "", emoji: "🐟", by: "Futuredish", url: "https://futuredish.com/korean-grilled-mackerel-everyday-korean-breakfast/", meal: "breakfast" },
   ...korean("Seonkyoung Longest", [
     ["Beef Bulgogi", "불고기", "🥩", "https://seonkyounglongest.com/bulgogi/", "dinner"],
     ["Japchae", "잡채", "🍜", "https://seonkyounglongest.com/japchae/", "dinner"],

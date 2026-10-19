@@ -15,6 +15,8 @@ const FILTERS = [
   { key: "all", emoji: "⭐", label: "All" },
   { key: "fav", emoji: "❤️", label: "Favorites" },
   ...MEALS.map((m) => ({ key: m.key, emoji: m.emoji, label: m.key === "snack" ? "Snacks" : m.label })),
+  { key: "spicy", emoji: "🌶️", label: "Spicy" },
+  { key: "healthy", emoji: "🥗", label: "Healthy" },
 ];
 
 // Words a dish can be found by: its names, ingredients and kinds ("Italian", "Soups"…).
@@ -67,6 +69,8 @@ export function viewMenu({ params }) {
   const matches = (d) => {
     if (kind !== "all" && cuisineOf(d) !== kind) return false;
     if (filter === "fav") return isFavorite(d);
+    if (filter === "spicy") return d.spicy > 0;
+    if (filter === "healthy") return (d.categories || []).includes("healthy") || (d.categories || []).includes("veggie");
     if (filter !== "all") return (d.meals || []).includes(filter);
     return true;
   };
@@ -123,6 +127,7 @@ const TRENDING = { key: "trending", emoji: "🔥", label: "Trending" };
 const INTROS = {
   trending: "Viral on TikTok and Instagram, and liked by the people who made them at home.",
   korean: "Healthy family Korean food from famous home cooks.",
+  fusion: "Korean-American mash-ups kids love: bulgogi tacos, kimchi quesadillas, gochujang wings.",
   american: "Family dinners, muffins and snacks from trusted recipe sites.",
 };
 let lastCuisine = "trending";

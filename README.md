@@ -6,6 +6,11 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
 
 - **Today**: what's for breakfast, lunch, dinner and snack. When a grown-up sets out
   2–3 choices, the kids pick tonight's dinner. Rate last night's dinner with faces 😍 😋 😐 😖.
+  Every planned meal has a **🔄 Change** button.
+- **Changing your mind is one tap**: tap a meal spot (or 🔄 Change) and pick one of four
+  **🔄 Try something else** ideas (🎲 for more), **📆 Move it to another day** (it swaps with
+  what's there), **🍱 Make extra for lunch tomorrow**, or use a **🧊 freezer meal**. Every
+  change shows an **Undo** button. An empty week offers **📋 Same as last week**.
 - **Week**: plan seven days. Tap a spot to pick a dish, add sides, or let the kids choose.
   **✨ Fill our week** offers two choices: **Use our favorites** fills the empty spots from
   the dishes the family rates highest; **Ask Claude** builds a balanced, healthy week and finds new recipes from
@@ -15,6 +20,13 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
   🇹🇭 Thai, 🫒 Mediterranean). Each dish has servings you can change (the ingredients
   rescale), steps, tips, food photos, hearts and everyone's faces.
   **👩‍🍳 Cook together** shows one big step at a time, with timers and read-aloud.
+- **🥗 Healthy · 🌶️ how spicy · ⚖️ cups or grams**: three switches on every recipe (and in
+  Settings) that change the ingredients, steps and shopping list. Healthy swaps in brown rice,
+  low-sodium soy sauce, whole-wheat pasta and bread, lean meat and less sugar, and air-frying
+  instead of deep-frying, plus each new dish's own tip. **Mild** leaves out chili flakes and
+  fresh chilies and halves the gochujang; **Spicy** adds more, for kids who love it hot.
+  Grams turns cups, pounds, ounces, °F and inches into grams, ml, °C and cm.
+  **🖨️ Print recipe card** prints just the recipe.
 - **🧊 What can we make?** (top of the Menu): tap or type what's in the fridge. It shows the
   dishes that are ready to cook, and the ones that need just a thing or two, with a button to
   put those things on the shopping list. Salt, oil, sauces and spices count as already there.
@@ -22,14 +34,26 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
   with **🛒 Add to shopping list** on its page. The same ingredient from different dishes is
   one line, with the total amount and which dishes it's for, sorted by aisle (including an Asian-market
   aisle), with the cupboard basics folded away. Tick things off, or send the list to a phone.
+  Things we already have are set aside under **✅ We have these**; **🏠 Done shopping** puts
+  everything ticked into "what we have", and after cooking you tap what got used up.
+  Leftover lunches and freezer meals aren't shopped for twice.
+- **📱 Shared shopping list** (optional): both grown-ups' phones tick the same list, live.
+  See [Shared shopping list](#shared-shopping-list) below.
+- **🏅 Brave Bites**: a sticker chart for trying new foods. Each new dish a kid tries and rates
+  earns a sticker; ten stickers and they pick a dinner.
+- **📆 Calendar**: Week → ⋯ → **Put our dinners on the calendar** makes a calendar file that
+  Google Calendar, Apple Calendar or Outlook can add.
 - **Add a dish**: paste a link (recipe sites, Instagram, TikTok, YouTube), snap a photo
   of a cookbook page or a screenshot, paste a caption, or write our own.
 - **📺 Videos**: a dish can have a YouTube, TikTok or Instagram video. It plays right on the
   dish page, and in **Cook together** the 📺 button keeps it above the steps while you cook.
 - **🙋 I want to eat…**: kids make wishes, and the grown-ups see them when planning.
 
-It starts with 118 family recipes, 105 of them with a cooking video: 42 healthy Korean home
-dishes (bulgogi, japchae, tteokguk, miyeok guk, gyeran jjim, jjajangmyeon, kimbap…),
+It starts with 152 family recipes, 148 of them with a cooking video. Most are Korean and
+Korean-American: 66 Korean dishes (bulgogi, japchae, tteokbokki, rosé tteokbokki, dakgangjeong,
+budae jjigae, jjimdak, mandu, gyeran jjim, kimbap…), 10 Korean fusion favorites (bulgogi tacos,
+kimchi quesadillas, kimchi mac & cheese, bulgogi cheesesteaks, gochujang wings, gochujang
+salmon…), and 25 spicy dishes for kids who like the heat. There are also
 American family dinners (turkey chili, mac & cheese, fish sticks, banana oat muffins…),
 Italian (lasagna, meatballs, minestrone, pesto pasta), Mexican (enchiladas, burrito bowls,
 tortilla soup, guacamole), Chinese (egg fried rice, beef & broccoli, potstickers, tomato &
@@ -123,6 +147,44 @@ Only a YouTube preview picture loads before you tap ▶ (TikTok and Instagram sh
 short TikTok share link (vm.tiktok.com/…) opens in TikTok instead of playing in the app.
 For a starter recipe, the video is the creator's version, so their amounts may differ a little.
 
+## Shared shopping list
+
+Both phones can tick the same shopping list, a few seconds apart. Because the app has no
+server of its own, the list lives in your own free Firebase project (Google's free "Spark"
+plan is plenty). Set it up once, on a computer, in about 10 minutes:
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com), sign in with a
+   Google account and **Create a project** (any name, like "our-family-menu"). Google Analytics
+   isn't needed.
+2. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable → Save.**
+3. **Build → Firestore Database → Create database.** Pick a location near you and start in
+   **production mode**.
+4. In Firestore, open the **Rules** tab, replace everything with this and **Publish**:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /families/{family} {
+         allow get, create, update: if request.auth != null && family.size() >= 24;
+       }
+     }
+   }
+   ```
+
+5. **Project settings** (⚙️ next to Project Overview) → **General** → **Your apps** → the
+   **</>** (Web) button. Give it a nickname and **Register app**. Copy the `apiKey` and the
+   `projectId` it shows.
+6. On the planning phone: **⚙️ Settings → 📱 Shared shopping list**, paste both and tap
+   **Start sharing**. Then **📤 Send the join link** to the other phone and open it there.
+
+The planning phone keeps the list up to date from the week's plan; the other phone sees the
+same list, ticks things off and adds extras. **🏠 Done shopping** on either phone puts what was
+bought into the planning phone's "what we have". The Firebase key is meant to be public (it
+only identifies the project); what keeps the list private is the long, random family code in
+the join link, so only send it to family. Only the shopping list is shared: recipes, photos and
+the plan stay on each device. **Stop sharing** in Settings turns it off.
+
 ## Grown-up PIN
 
 In **⚙️ Settings → 🔒 Grown-up PIN**, set a 4-digit PIN. Then Settings, editing,
@@ -141,13 +203,16 @@ monthly.
 ## About the recipes
 
 The starter recipes are home-style versions written for this app. The **✨ Ideas from famous cooks**
-list (Menu → ➕ Add) has three tabs:
+list (Menu → ➕ Add) has a tab for each kind of food:
 
 - **🔥 Trending**: dishes that went viral on TikTok and Instagram, each with a one-line note
   on what people who made them said. The notes come from published taste tests and
   reviews (Good Morning America, The Kitchn, Food52, Time Out, food bloggers), not from
   reading the comments on the posts themselves.
-- **🇰🇷 Korean**: Seonkyoung Longest, Korean Bapsang, Maangchi and My Korean Kitchen.
+- **🇰🇷 Korean**: Seonkyoung Longest, Korean Bapsang, Maangchi, My Korean Kitchen, Kimchimari,
+  Beyond Kimchee, Aaron and Claire and Chef Chris Cho.
+- **🌮 Korean fusion**: Korean-American mash-ups from My Korean Kitchen, Kimchimari, Judy Joo,
+  Beyond Kimchee, Korean Bapsang, Aaron and Claire and Seonkyoung Longest.
 - **🇺🇸 American**: Natasha's Kitchen, Once Upon a Chef, Sally's Baking Addiction and Super
   Healthy Kids.
 - **🇮🇹 🇲🇽 🇨🇳 🇯🇵 🇮🇳 🇹🇭 🫒**: Inspired Taste, Rick Bayless, Budget Bytes, Just One Cookbook,
@@ -168,14 +233,15 @@ A static web app with no build step. Open `index.html` through any web server.
 |---|---|
 | `index.html`, `styles.css` | Page shell and all styles |
 | `js/app.js` | Starts the app and routes `#/screens` |
-| `js/views/*.js` | One file per screen (`fridge.js` is "What can we make?") |
+| `js/views/*.js` | One file per screen (`fridge.js` is "What can we make?" and the freezer, `stickers.js` is Brave Bites) |
 | `js/store.js` | In-memory data plus saving to IndexedDB |
 | `js/components.js`, `js/ui.js` | Shared pieces: tiles, sheets, PIN pad, photos |
-| `js/recipe.js` | Ingredient parsing, servings scaling, shopping list, timers, what-can-we-make matching |
-| `js/planner.js` | Dates and the no-AI "Use our favorites" |
+| `js/recipe.js` | Ingredient parsing, servings scaling, shopping list, timers, what-can-we-make matching, healthy swaps, spice levels, metric |
+| `js/planner.js` | Dates, the no-AI "Use our favorites", "Try something else" ideas, the calendar file |
+| `js/share.js` | The shared shopping list (Firebase Auth and Firestore over plain REST) |
 | `js/ai.js` | Claude: recipe import, finding videos and week planning |
 | `js/video.js` | Turns YouTube / TikTok / Instagram / Vimeo links into players |
-| `js/seed.js` | Starter recipes (in batches) and the "Ideas from famous cooks" list |
+| `js/seed.js`, `js/seed-fusion.js` | Starter recipes (in batches; batch 4 is Korean and Korean fusion) and the "Ideas from famous cooks" list |
 | `sw.js`, `manifest.webmanifest` | Offline support and the Android share target |
 | `vendor/` | The official Anthropic SDK bundled as one module |
 

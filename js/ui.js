@@ -158,14 +158,17 @@ export function once(fn) {
 
 // ---------- Toasts ----------
 
-export function toast(message, { emoji = "✅", ms = 2600 } = {}) {
-  const t = h("div.toast", { role: "status" }, h("span.toast-emoji", emoji), h("span", message));
-  document.body.append(t);
-  requestAnimationFrame(() => t.classList.add("show"));
-  setTimeout(() => {
+/** A message at the bottom. action: { label, onclick } adds a button, like "Undo". */
+export function toast(message, { emoji = "✅", ms = 2600, action = null } = {}) {
+  const hide = () => {
     t.classList.remove("show");
     setTimeout(() => t.remove(), 300);
-  }, ms);
+  };
+  const t = h("div.toast", { role: "status" }, h("span.toast-emoji", emoji), h("span", message),
+    action ? h("button.toast-action", { onclick: () => { hide(); action.onclick(); } }, action.label) : null);
+  document.body.append(t);
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(hide, action ? Math.max(ms, 6000) : ms);
 }
 
 // ---------- Confetti ----------

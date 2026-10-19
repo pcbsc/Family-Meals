@@ -38,6 +38,10 @@ test("text colors meet WCAG AA contrast (4.5:1)", () => {
     [vars.muted, "#ffffff", "grey text on cards"],
     [vars.ink, vars.bg, "text on the page"],
     [vars["primary-dark"], vars.bg, "cook-along step words"],
+    [vars["green-dark"], vars["green-soft"], "healthy-swap tags and the shared-list note"],
+    [vars["green-dark"], "#ffffff", "the healthy note on a card"],
+    [vars["primary-dark"], vars["primary-soft"], "skip-for-mild tags and shared-list warnings"],
+    [vars.ink, "#fff4c7", "Brave Bites stickers and tips"],
     ...Object.entries(vars).filter(([k]) => k.startsWith("aisle-")).flatMap(([k, color]) => [
       ["#ffffff", color, `white on the ${k} header`],
       [color, "#ffffff", `${k} amounts on white`],

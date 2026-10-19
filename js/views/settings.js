@@ -3,8 +3,162 @@
 import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti, once } from "../ui.js";
 import { dateKey } from "../planner.js";
 import { MEALS, AVATARS, STARTER_DISHES, LATEST_STARTER_BATCH } from "../seed.js";
-import { state, saveSettings, addStarterDishes, loadAll, go, refresh, db } from "../store.js";
+import { SPICE_LEVELS } from "../recipe.js";
+import { state, saveSettings, addStarterDishes, loadAll, go, refresh, db, cookPrefs } from "../store.js";
 import { grownUp, backHeader, stepper, chip } from "../components.js";
+import { shareConfig, validSetup, newFamilyId, joinLink, parseJoin, startList, readList, forgetToken } from "../share.js";
+
+/** Healthy swaps, spice level and units: the same switches as on every recipe. */
+function cookWayCard() {
+  const box = h("div.stack");
+  const draw = () => {
+    clearChildren(box);
+    const p = cookPrefs();
+    const set = async (patch) => { await saveSettings(patch); draw(); };
+    box.append(
+      h("span.field-label", "Healthy swaps (brown rice, less sugar, low-sodium soy sauce…)"),
+      h("div.row.wrap", chip("Healthy", { emoji: "🥗", on: p.healthy, onclick: () => set({ healthy: !p.healthy }) })),
+      h("span.field-label", "How spicy we like it"),
+      h("div.row.wrap", SPICE_LEVELS.map((l) => chip(l.label, { emoji: l.emoji, on: p.spice === l.key, onclick: () => set({ spice: l.key }) }))),
+      h("span.field-label", "Amounts"),
+      h("div.row.wrap",
+        chip("Cups & pounds", { emoji: "🥄", on: !p.metric, onclick: () => set({ metric: false }) }),
+        chip("Grams & ml", { emoji: "⚖️", on: p.metric, onclick: () => set({ metric: true }) }),
+      ),
+    );
+  };
+  draw();
+  return h("section.card",
+    h("h2", "🍳 How we cook"),
+    h("p.muted", "Every recipe and the shopping list follow these. You can also change them on any recipe."),
+    box,
+  );
+}
+
+/** Share the shopping list with a second phone, through the family's own free Firebase project. */
+function shareCard() {
+  const box = h("div.stack");
+  const draw = () => {
+    clearChildren(box);
+    const cfg = shareConfig();
+    if (cfg) {
+      const link = joinLink(cfg);
+      box.append(
+        h("p", cfg.role === "member"
+          ? "✅ This phone uses the family's shared shopping list."
+          : "✅ The shopping list is shared. Open this link on the other phone to join:"),
+        cfg.role === "member" ? null : h("input.text", { value: link, readonly: true, "aria-label": "Join link", onfocus: (e) => e.target.select() }),
+        h("div.row.wrap",
+          cfg.role === "member" ? null : h("button.btn.primary", {
+            onclick: async () => {
+              try {
+                if (navigator.share) await navigator.share({ title: "Join our shopping list", text: "Open this to share our Family Menu shopping list:", url: link });
+                else {
+                  await navigator.clipboard.writeText(link);
+                  toast("Link copied! Send it to the other phone.", { emoji: "📋" });
+                }
+              } catch (err) {
+                if (err?.name !== "AbortError") toast("Copy the link from the box above.", { emoji: "📋" });
+              }
+            },
+          }, "📤 Send the join link"),
+          h("button.btn.ghost", {
+            onclick: async () => {
+              if (!(await confirmSheet("Stop sharing the shopping list on this phone?", { yes: "Stop sharing" }))) return;
+              forgetToken();
+              await saveSettings({ share: null });
+              draw();
+            },
+          }, "Stop sharing"),
+        ),
+        h("p.muted.small", "Anyone with the link can see and tick the list, so only send it to family."),
+      );
+      return;
+    }
+    let apiKey = "";
+    let projectId = "";
+    const status = h("p.muted.small", { role: "status" });
+    box.append(
+      h("p", "Both grown-ups' phones can tick the same list in the store. It needs a free Firebase project (10 minutes, once). The ",
+        h("a", { href: "https://github.com/pcbsc/Family-Meals#shared-shopping-list", target: "_blank", rel: "noopener" }, "README"), " has the steps."),
+      h("label.field", h("span.field-label", "Web API key"),
+        h("input.text", { autocomplete: "off", placeholder: "AIza…", oninput: (e) => (apiKey = e.target.value.trim()) })),
+      h("label.field", h("span.field-label", "Project ID"),
+        h("input.text", { autocomplete: "off", placeholder: "our-family-menu", oninput: (e) => (projectId = e.target.value.trim()) })),
+      status,
+      h("button.btn.primary", {
+        onclick: async () => {
+          if (!validSetup(apiKey, projectId)) {
+            status.textContent = "❌ That doesn't look like a Firebase web API key and project ID.";
+            return;
+          }
+          status.textContent = "Setting up…";
+          const cfg = { apiKey, projectId, familyId: newFamilyId(), role: "owner" };
+          await saveSettings({ share: cfg });
+          try {
+            forgetToken();
+            await startList(cfg, dateKey(new Date()));
+            confetti(["📱", "🛒", "🎉"]);
+            draw();
+          } catch (err) {
+            await saveSettings({ share: null });
+            status.textContent = `❌ ${err.status === 403 || err.status === 400
+              ? "Firebase said no. Check that Anonymous sign-in is on and the rules are pasted in (see the README)."
+              : err.message}`;
+          }
+        },
+      }, "📱 Start sharing"),
+    );
+  };
+  draw();
+  return h("section.card", h("h2", "📱 Shared shopping list"), box);
+}
+
+// ---------- Joining another phone's list ----------
+
+export function viewJoin({ params }) {
+  const cfg = parseJoin(params);
+  const body = h("div.stack");
+  if (!cfg) {
+    body.append(h("div.empty-state", h("div.huge-emoji", "🤔"), h("p", "This join link looks broken. Ask for a new one."),
+      h("button.btn.primary", { onclick: () => go("#/today", { replace: true }) }, "🏠 Go home")));
+  } else {
+    const status = h("p.muted", { role: "status" });
+    body.append(
+      h("div.huge-emoji.center", "📱"),
+      h("h1.center", "Join the family shopping list?"),
+      h("p.big-text.center", "This phone will see the same list and ticks as the planning phone."),
+      status,
+      h("button.btn.primary.big.wide", {
+        onclick: once(async () => {
+          status.textContent = "Joining…";
+          await saveSettings({ share: { ...cfg, role: "member" } });
+          forgetToken();
+          try {
+            const list = await readList(cfg);
+            if (!list) throw Object.assign(new Error("gone"), { status: 404 });
+            await saveSettings({ share: { ...state.settings.share, last: list } });
+            confetti(["🛒", "🎉"]);
+            if (state.settings.onboarded) go("#/shop", { replace: true });
+            else {
+              // A brand-new phone: set up the family and menu next. The list stays joined.
+              toast("Joined! Now let's set up this phone.", { emoji: "📱" });
+              go("#/welcome", { replace: true });
+            }
+          } catch (err) {
+            await saveSettings({ share: null });
+            status.textContent = err.status === 404 ? "❌ That list isn't there anymore. Ask for a new link."
+              : err.status === 403 ? "❌ Firebase said no. Check the rules (see the README)."
+                : "❌ Couldn't reach the list. Check the internet and try again.";
+            refresh();
+          }
+        }),
+      }, "✅ Join"),
+      h("button.btn.ghost.wide", { onclick: () => go("#/today", { replace: true }) }, "Not now"),
+    );
+  }
+  return h("div.screen.join", body);
+}
 
 function avatarPicker(current, onPick) {
   openSheet((close) =>
@@ -143,7 +297,7 @@ export async function viewSettings() {
 
   return h("div.screen.settings",
     backHeader("⚙️ Settings", { back: "#/today" }),
-    h("p.muted", "For grown-ups. Everything is saved on this device only."),
+    h("p.muted", "For grown-ups. Everything is saved on this device only (except the shopping list, if you share it)."),
 
     h("section.card", h("h2", "👨‍👩‍👧 Our family"), h("p.muted", "Everyone gets a face for rating dishes and making wishes."), familyEditor()),
 
@@ -155,10 +309,13 @@ export async function viewSettings() {
       h("span.field-label", "Our week starts on"), weekRow,
     ),
 
+    cookWayCard(),
+    shareCard(),
+
     h("section.card",
       h("h2", "🥗 Food notes for Claude"),
       h("label.field", h("span.field-label", "Allergies, dislikes, spice level"),
-        h("textarea.text", { rows: 3, value: s.foodNotes, placeholder: "No peanuts. Kids like mild food. Dad doesn't eat mushrooms.", onchange: (e) => saveSettings({ foodNotes: e.target.value }) })),
+        h("textarea.text", { rows: 3, value: s.foodNotes, placeholder: "No peanuts. Our 7-year-old likes spicy food. Dad doesn't eat mushrooms.", onchange: (e) => saveSettings({ foodNotes: e.target.value }) })),
       h("label.field", h("span.field-label", "What we like to eat"),
         h("textarea.text", { rows: 3, value: s.cuisineMix, onchange: (e) => saveSettings({ cuisineMix: e.target.value }) })),
     ),
@@ -269,7 +426,7 @@ export function viewWelcome() {
   };
   const stepMenu = () => {
     clearChildren(body);
-    const korean = STARTER_DISHES.filter((d) => d.categories.includes("korean")).length;
+    const korean = STARTER_DISHES.filter((d) => d.cuisine === "korean" || d.cuisine === "fusion").length;
     const finish = async (withStarters) => {
       const people = state.settings.members.length;
       await saveSettings({
@@ -282,7 +439,7 @@ export function viewWelcome() {
     };
     body.append(
       h("h1", "Start with some dishes?"),
-      h("p.big-text", `We have ${STARTER_DISHES.length} family recipes ready, most with a cooking video: ${korean} healthy Korean favorites (bulgogi, japchae, tteokguk…), plus American, Italian, Mexican, Chinese, Japanese, Indian, Thai and Mediterranean dishes kids love.`),
+      h("p.big-text", `We have ${STARTER_DISHES.length} family recipes ready, almost all with a cooking video: ${korean} Korean and Korean-American favorites (bulgogi, tteokbokki, bulgogi tacos, kimchi quesadillas…), plus American, Italian, Mexican, Chinese, Japanese, Indian, Thai and Mediterranean dishes kids love.`),
       h("button.btn.primary.big.wide", { onclick: () => finish(true) }, "✅ Yes, add them"),
       h("button.btn.ghost.wide", { onclick: () => finish(false) }, "No thanks, we'll add our own"),
     );

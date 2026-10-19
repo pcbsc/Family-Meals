@@ -5,7 +5,7 @@ import { MEALS, FACES } from "./seed.js";
 import { dateKey, addDays, isFavorite } from "./planner.js";
 import {
   state, members, memberById, enabledMeals, dishList, rating, rateDish, photoUrl, getSlot,
-  setSlotDishes, slotDishes, addWish, saveSettings, go, refresh,
+  setSlotDishes, slotDishes, addWish, saveSettings, go, refresh, stickersFor,
 } from "./store.js";
 
 /** Asks for the grown-up PIN if one is set. A forgotten PIN can be reset by answering a sum. */
@@ -105,8 +105,15 @@ export function rateSheet(dish, { onDone } = {}) {
                 type: "button",
                 "aria-label": `${m.name}: ${f.label}`,
                 onclick: async () => {
-                  await rateDish(dish.id, m.id, f.score);
-                  if (f.score === 4) confetti(["😍", "❤️", "⭐", "🎉"]);
+                  const brave = await rateDish(dish.id, m.id, f.score);
+                  if (brave) {
+                    const mine = stickersFor(m.id);
+                    const sticker = mine.find((x) => x.dish.id === dish.id)?.sticker || "⭐";
+                    confetti([sticker, "🏅", "⭐"]);
+                    toast(`Brave Bite! ${m.name} got a ${sticker} sticker for trying ${dish.name}.`, {
+                      emoji: "🏅", ms: 4000, action: { label: "See stickers", onclick: () => { close(); go("#/stickers"); } },
+                    });
+                  } else if (f.score === 4) confetti(["😍", "❤️", "⭐", "🎉"]);
                   draw();
                 },
               }, f.emoji),

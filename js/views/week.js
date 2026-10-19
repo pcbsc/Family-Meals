@@ -1,11 +1,12 @@
 // Week: seven days of meals. Tap a spot to fill it, let the kids choose,
 // fill the week with favorites (no AI), or have Claude plan it.
-import { h, openSheet, toast, confetti, confirmSheet, clearChildren, prettyDate, once } from "../ui.js";
+import { h, openSheet, toast, confetti, confirmSheet, clearChildren, prettyDate, once, downloadFile, minutesText } from "../ui.js";
 import { MEALS, cuisineOf } from "../seed.js";
-import { dateKey, fromKey, addDays, weekStart, weekDays, fillWithFavorites, isFavorite } from "../planner.js";
+import { dateKey, fromKey, addDays, weekStart, weekDays, fillWithFavorites, isFavorite, suggestDishes, weekCalendar } from "../planner.js";
 import {
   state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, saveDish, dishList, members, memberById,
-  removeWish, wishLabel, planHistory, go, refresh,
+  removeWish, wishLabel, planHistory, go, refresh, snapshotSlots, restoreSlots, moveSlot, planLeftovers,
+  freezer, planFromFreezer, cookPrefs,
 } from "../store.js";
 import { grownUp, dishArt, pickDishes, stepper, chip, progressSheet, needKeySheet } from "../components.js";
 
@@ -24,8 +25,19 @@ const showPast = {};
 
 // ---------- One meal spot ----------
 
-function slotSheet(dayKey, meal) {
+/** Says what changed, with an Undo that puts the spots back. */
+function changed(message, snapshot, emoji = "🔄") {
+  toast(message, { emoji, action: { label: "Undo", onclick: async () => { await restoreSlots(snapshot); refresh(); } } });
+}
+
+const itemBadge = (item) => (item.leftover ? " 🍱" : item.fromFreezer ? " 🧊" : "");
+
+/** Everything you can do with one meal spot: swap, move, leftovers, freezer, kids' choice. */
+export function slotSheet(dayKey, meal) {
   const m = MEALS.find((x) => x.key === meal);
+  // "More ideas" shows ones we haven't shown yet, until we run out and start over.
+  let shown = new Set();
+  let ideas = null;
   openSheet((close) => {
     const body = h("div.stack");
     const draw = () => {
@@ -36,7 +48,12 @@ function slotSheet(dayKey, meal) {
       for (const item of items) {
         body.append(h("div.slot-item",
           h("button.slot-dish", { onclick: async () => { await close(); go(`#/dish/${item.dish.id}`); } },
-            dishArt(item.dish, { className: "art-sm" }), h("span.slot-dish-name", item.dish.name)),
+            dishArt(item.dish, { className: "art-sm" }),
+            h("span.slot-dish-name", item.dish.name, itemBadge(item),
+              item.leftover ? h("span.muted.block.small", "Leftovers from yesterday") : null,
+              item.fromFreezer ? h("span.muted.block.small", "From the freezer") : null,
+              item.extraFor ? h("span.muted.block.small", "Making extra for tomorrow's lunch") : null),
+          ),
           h("div.slot-servings",
             h("span.muted.small", "people"),
             stepper(item.servings || state.settings.servings, {
@@ -50,8 +67,10 @@ function slotSheet(dayKey, meal) {
           h("button.icon-btn", {
             "aria-label": `Remove ${item.dish.name}`,
             onclick: async () => {
+              const snap = snapshotSlots([[dayKey, meal]]);
               const fresh = getSlot(dayKey, meal);
               await saveSlot({ ...fresh, items: fresh.items.filter((i) => i.dishId !== item.dishId) });
+              changed(`${item.dish.name} was taken off.`, snap, "🗑️");
               draw();
             },
           }, "✕"),
@@ -65,11 +84,95 @@ function slotSheet(dayKey, meal) {
         );
       }
       if (!items.length && !choices.length) body.append(h("p.muted", "Nothing planned yet."));
+
+      // One tap to try something else: a few good ideas for this meal.
+      const main = items[0]?.dish;
+      const planned = new Set(items.map((i) => i.dish.id));
+      const suggest = () => {
+        const opts = { meal, cuisine: main ? cuisineOf(main) : "", cuisineOf };
+        let next = suggestDishes(dishList(), { ...opts, exclude: new Set([...planned, ...shown]) });
+        if (next.length < 4 && shown.size) {
+          shown = new Set();
+          next = suggestDishes(dishList(), { ...opts, exclude: planned });
+        }
+        for (const d of next) shown.add(d.id);
+        return next;
+      };
+      // The same ideas until someone asks for more (or picks one).
+      if (!ideas || ideas.some((d) => planned.has(d.id) || !state.dishes.has(d.id))) ideas = suggest();
+      if (ideas.length) {
+        body.append(h("section.stack.swap-ideas",
+          h("div.section-head",
+            h("h3", items.length ? "🔄 Try something else" : "💡 Ideas"),
+            h("button.btn.ghost.small", { onclick: () => { ideas = suggest(); draw(); } }, "🎲 More ideas"),
+          ),
+          h("div.idea-row", ideas.map((d) => h("button.idea", {
+            "aria-label": `${items.length ? "Swap for" : "Pick"} ${d.name}`,
+            onclick: async () => {
+              const snap = snapshotSlots([[dayKey, meal]]);
+              await setSlotDishes(dayKey, meal, [d.id]);
+              changed(items.length ? `Swapped for ${d.name}.` : `${d.name} it is!`, snap);
+              draw();
+            },
+          }, dishArt(d, { className: "art-idea" }), h("span.idea-name", d.name)))),
+        ));
+      }
+
+      // Move it to another day this week (swapping with whatever is there).
+      if (items.length || choices.length) {
+        const start = weekStart(fromKey(dayKey), state.settings.weekStartsOn);
+        const others = weekDays(start).map(dateKey).filter((k) => k !== dayKey && k >= dateKey(new Date()));
+        if (others.length) {
+          body.append(h("section.stack",
+            h("h3", "📆 Move to another day"),
+            h("div.row.wrap", others.map((k) => h("button.chip", {
+              onclick: async () => {
+                const snap = snapshotSlots([[dayKey, meal], [k, meal]]);
+                await moveSlot(dayKey, k, meal);
+                await close();
+                changed(`Moved to ${prettyDate(fromKey(k), { weekday: "long" })}.`, snap, "📆");
+                refresh();
+              },
+            }, prettyDate(fromKey(k), { weekday: "short" }), slotDishes(getSlot(k, meal)).length ? " ⇄" : ""))),
+          ));
+        }
+      }
+
+      const extras = [];
+      // Dinner tonight, leftovers tomorrow: cook double and lunch is done.
+      if (meal === "dinner" && items.length && !items[0].extraFor) {
+        extras.push(h("button.btn.soft", {
+          onclick: async () => {
+            const tomorrow = addDays(fromKey(dayKey), 1);
+            const snap = snapshotSlots([[dayKey, "dinner"], [tomorrow, "lunch"]]);
+            await planLeftovers(dayKey, "dinner", items[0].dish.id);
+            changed(`Cooking double: tomorrow's lunch is ${items[0].dish.name} leftovers.`, snap, "🍱");
+            draw();
+          },
+        }, "🍱 Make extra for lunch tomorrow"));
+      }
+      const frozen = freezer();
+      if (frozen.length) {
+        extras.push(h("section.stack",
+          h("h3", "🧊 From the freezer"),
+          h("div.row.wrap", frozen.map((f) => {
+            const d = state.dishes.get(f.dishId);
+            return h("button.chip", {
+              onclick: async () => {
+                const snap = snapshotSlots([[dayKey, meal]]);
+                await planFromFreezer(dayKey, meal, d.id);
+                changed(`${d.name} from the freezer. Nothing to buy!`, snap, "🧊");
+                draw();
+              },
+            }, `${d.emoji} ${d.name} ×${f.meals}`);
+          })),
+        ));
+      }
       const pick = (opts) => async () => {
         await close();
         pickDishes(opts);
       };
-      body.append(h("div.button-list",
+      body.append(...extras, h("div.button-list",
         h("button.btn.primary", {
           onclick: pick({
             meal,
@@ -79,17 +182,19 @@ function slotSheet(dayKey, meal) {
               refresh();
             },
           }),
-        }, items.length ? "➕ Add a side dish" : "➕ Pick a dish"),
+        }, items.length ? "➕ Add a side dish" : "📖 Pick from the menu"),
         items.length ? h("button.btn.soft", {
           onclick: pick({
             meal,
             title: "Swap for…",
             onPick: async (ids) => {
+              const snap = snapshotSlots([[dayKey, meal]]);
               await setSlotDishes(dayKey, meal, ids);
+              changed("Swapped.", snap);
               refresh();
             },
           }),
-        }, "🔄 Swap") : null,
+        }, "📖 Swap from the menu") : null,
         h("button.btn.soft", {
           onclick: pick({
             meal,
@@ -105,7 +210,9 @@ function slotSheet(dayKey, meal) {
         }, "🧒 Let the kids choose"),
         items.length ? h("button.btn.ghost", {
           onclick: async () => {
+            const snap = snapshotSlots([[dayKey, meal]]);
             await saveSlot({ ...slot, items: [], choices: [] });
+            changed("Cleared.", snap, "🧹");
             draw();
           },
         }, "🧹 Clear") : null,
@@ -124,7 +231,7 @@ function slotRow(day, meal) {
   return h(`button.slot-row${items.length ? ".filled" : ""}`, { style: { "--meal": meal.color }, onclick: () => slotSheet(key, meal.key) },
     h("span.slot-meal", { title: meal.label }, meal.emoji),
     items.length
-      ? [dishArt(items[0].dish, { className: "art-xs" }), h("span.slot-names", items.map((i) => i.dish.name).join(" + "))]
+      ? [dishArt(items[0].dish, { className: "art-xs" }), h("span.slot-names", items.map((i) => i.dish.name + itemBadge(i)).join(" + "))]
       : h("span.slot-empty", choices ? `🧒 Kids choose (${choices})` : `+ ${meal.label}`),
   );
 }
@@ -185,6 +292,8 @@ function buildPlanRequest({ slotsToFill, days, note, newIdeas }) {
     },
     foodNotes: state.settings.foodNotes,
     cuisineMix: state.settings.cuisineMix,
+    spiceLevel: cookPrefs().spice,
+    healthyCooking: cookPrefs().healthy,
     noteForThisWeek: note,
     newIdeas,
     slotsToFill: slotsToFill.map((s) => ({ ...s, weekday: prettyDate(fromKey(s.date), { weekday: "long" }) })),
@@ -402,11 +511,45 @@ async function copyLastWeek(start) {
   refresh();
 }
 
+/** The week's dinners as a calendar file: Google Calendar, Apple Calendar or Outlook can add it. */
+async function addToCalendar(days) {
+  const today = dateKey(new Date());
+  const entries = [];
+  for (const d of days) {
+    if (dateKey(d) < today) continue;
+    const items = slotDishes(getSlot(dateKey(d), "dinner"));
+    if (!items.length) continue;
+    const [main] = items;
+    const minutes = (main.dish.prepMinutes || 0) + (main.dish.cookMinutes || 0);
+    entries.push({
+      date: d,
+      meal: "dinner",
+      title: `🍽️ ${items.map((i) => i.dish.name).join(" + ")}`,
+      detail: [main.leftover ? "Leftovers from yesterday" : main.fromFreezer ? "From the freezer" : minutes ? `Takes about ${minutesText(minutes)}` : "", "From Family Menu"].filter(Boolean).join("\n"),
+    });
+  }
+  if (!entries.length) return toast("No dinners planned from today on.", { emoji: "📆" });
+  const name = `family-menu-dinners-${dateKey(days[0])}.ics`;
+  const text = weekCalendar(entries);
+  const file = typeof File === "function" ? new File([text], name, { type: "text/calendar" }) : null;
+  try {
+    if (file && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: "Our dinners" });
+      return;
+    }
+  } catch (err) {
+    if (err?.name === "AbortError") return;
+  }
+  downloadFile(name, text, "text/calendar");
+  toast(`${entries.length} dinner${entries.length === 1 ? "" : "s"} saved. Open the file to add them to your calendar.`, { emoji: "📆", ms: 5000 });
+}
+
 function moreSheet(start, days) {
   openSheet((close) =>
     h("div.button-list",
       h("button.btn.soft", { onclick: async () => { await close(); copyLastWeek(start); } }, "📋 Copy last week's meals"),
       h("button.btn.soft", { onclick: async () => { await close(); go(`#/shop?w=${dateKey(start)}`); } }, "🛒 Shopping list for this week"),
+      h("button.btn.soft", { onclick: async () => { await close(); addToCalendar(days); } }, "📆 Put our dinners on the calendar"),
       h("button.btn.danger", {
         onclick: async () => {
           await close();
@@ -459,6 +602,11 @@ export function viewWeek({ params }) {
     ),
     !isThisWeek ? h("button.btn.ghost.center-btn", { onclick: () => go("#/week", { replace: true }) }, "Back to this week") : null,
     h("button.btn.primary.big.wide", { onclick: () => fillSheet(days) }, "✨ Fill our week"),
+    // An empty week is one tap from last week's meals.
+    days.every((d) => meals.every((m) => !slotDishes(getSlot(dateKey(d), m.key)).length))
+      && weekDays(addDays(start, -7)).some((d) => meals.some((m) => slotDishes(getSlot(dateKey(d), m.key)).length))
+      ? h("button.btn.soft.wide", { onclick: () => copyLastWeek(start) }, "📋 Same as last week")
+      : null,
     wishesBar(),
     // Days already gone this week stay out of the way until asked for.
     pastDays && !showPast[dateKey(start)]

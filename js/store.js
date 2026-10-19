@@ -2,7 +2,15 @@
 // written to IndexedDB straight away, then the current screen redraws.
 import * as db from "./db.js";
 import { MEALS, STARTER_DISHES, LATEST_STARTER_BATCH, startersToAdd, starterVideoFills } from "./seed.js";
-import { dateKey, addDays, slotId, averageRating, weekStart } from "./planner.js";
+import { dateKey, fromKey, addDays, slotId, averageRating, weekStart } from "./planner.js";
+
+const FOOD_NOTES = "Our kids like some spice (our 7-year-old loves spicy food). Keep a mild way to make spicy dishes.";
+const CUISINE_MIX = "Mostly Korean home cooking, Korean-American and Korean fusion favorites (like bulgogi tacos and kimchi quesadillas), plus some American, Italian and Mexican family dinners. Kid-friendly, with healthy choices.";
+// Older defaults, replaced when the family never changed them.
+const OLD_DEFAULTS = {
+  foodNotes: ["Kids like mild (not spicy) food."],
+  cuisineMix: ["Mostly healthy Korean home cooking, plus everyday American, Italian and Mexican family favorites."],
+};
 
 export const DEFAULT_SETTINGS = {
   onboarded: false,
@@ -10,8 +18,11 @@ export const DEFAULT_SETTINGS = {
   servings: 4,
   meals: ["breakfast", "lunch", "dinner", "snack"],
   weekStartsOn: 0,
-  foodNotes: "Kids like mild (not spicy) food.",
-  cuisineMix: "Mostly healthy Korean home cooking, plus everyday American, Italian and Mexican family favorites.",
+  foodNotes: FOOD_NOTES,
+  cuisineMix: CUISINE_MIX,
+  healthy: false,
+  spice: "medium",
+  metric: false,
   apiKey: "",
   pin: "",
   lastBackupAt: null,
@@ -54,6 +65,9 @@ export async function loadAll() {
     db.getAll("shopping"),
   ]);
   state.settings = { ...DEFAULT_SETTINGS, ...(settingsRow?.value || {}) };
+  for (const [key, olds] of Object.entries(OLD_DEFAULTS)) {
+    if (olds.includes(state.settings[key])) state.settings[key] = DEFAULT_SETTINGS[key];
+  }
   state.dishes = new Map(dishes.map((d) => [d.id, d]));
   state.plan = new Map(plan.map((s) => [s.id, s]));
   state.wishes = wishes.sort((a, b) => a.createdAt - b.createdAt);
@@ -65,6 +79,12 @@ export async function loadAll() {
 export async function saveSettings(patch) {
   state.settings = { ...state.settings, ...patch };
   await db.put("settings", { key: "main", value: state.settings });
+}
+
+/** How this family cooks: healthier swaps, spice level, metric. */
+export function cookPrefs() {
+  const s = state.settings;
+  return { healthy: !!s.healthy, spice: ["mild", "medium", "spicy"].includes(s.spice) ? s.spice : "medium", metric: !!s.metric };
 }
 
 export function members() {
@@ -162,10 +182,33 @@ export function rating(dish) {
   return averageRating(dish);
 }
 
+/** Saves a face. Returns true if it's a kid's first time rating this dish: a Brave Bite. */
 export async function rateDish(dishId, memberId, score) {
   const dish = state.dishes.get(dishId);
-  if (!dish) return;
-  await updateDish(dishId, { ratings: { ...(dish.ratings || {}), [memberId]: score } });
+  if (!dish) return false;
+  const first = dish.ratings?.[memberId] == null;
+  await updateDish(dishId, {
+    ratings: { ...(dish.ratings || {}), [memberId]: score },
+    ratedAt: { ...(dish.ratedAt || {}), [memberId]: dish.ratedAt?.[memberId] || Date.now() },
+  });
+  return first && !!memberById(memberId)?.kid;
+}
+
+// ---------- Brave Bites ----------
+
+const STICKERS = ["🦁", "🐯", "🦖", "🦄", "🐼", "🐸", "🦊", "🐙", "🦋", "🐳", "🚀", "⭐", "🌈", "🏆", "🐲", "🦒", "🐧", "🦜", "🍄", "🌻"];
+export const STICKERS_PER_PRIZE = 10;
+
+/** A kid's stickers: one for every dish they've tried and rated, oldest first. */
+export function stickersFor(memberId) {
+  const out = [];
+  for (const dish of state.dishes.values()) {
+    if (dish.ratings?.[memberId] == null) continue;
+    let hash = 0;
+    for (const ch of dish.id + memberId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    out.push({ dish, sticker: STICKERS[hash % STICKERS.length], at: dish.ratedAt?.[memberId] || 0 });
+  }
+  return out.sort((a, b) => a.at - b.at || a.dish.name.localeCompare(b.dish.name));
 }
 
 // ---------- Photos ----------
@@ -227,6 +270,66 @@ export async function saveSlot(slot) {
   state.plan.set(full.id, full);
   await db.put("plan", full);
   return full;
+}
+
+/** A copy of some meal spots, to put back with restoreSlots (for Undo). */
+export function snapshotSlots(spots) {
+  return spots.map(([date, meal]) => {
+    const key = typeof date === "string" ? date : dateKey(date);
+    return { key, meal, slot: structuredClone(getSlot(key, meal) || null) };
+  });
+}
+
+export async function restoreSlots(snapshot) {
+  for (const { key, meal, slot } of snapshot) await saveSlot(slot || { date: key, meal, items: [], choices: [] });
+}
+
+/** Moves a meal to another day (same meal), swapping with whatever was there. */
+export async function moveSlot(fromKey, toKey, meal) {
+  if (fromKey === toKey) return;
+  const from = getSlot(fromKey, meal) || { items: [], choices: [] };
+  const to = getSlot(toKey, meal) || { items: [], choices: [] };
+  await saveSlot({ date: toKey, meal, items: from.items || [], choices: from.choices || [] });
+  await saveSlot({ date: fromKey, meal, items: to.items || [], choices: to.choices || [] });
+}
+
+/** Cooks extra tonight so tomorrow's lunch is leftovers (the shopping list buys it with tonight's). */
+export async function planLeftovers(dayKey, meal, dishId) {
+  const slot = getSlot(dayKey, meal);
+  const item = slot?.items?.find((i) => i.dishId === dishId);
+  if (!item) return null;
+  const tomorrow = dateKey(addDays(fromKey(dayKey), 1));
+  const lunch = getSlot(tomorrow, "lunch") || { date: tomorrow, meal: "lunch", items: [], choices: [] };
+  const servings = item.servings || state.settings.servings || 4;
+  await saveSlot({ ...lunch, items: [{ dishId, servings, leftover: true }], choices: [] });
+  await saveSlot({ ...slot, items: slot.items.map((i) => (i.dishId === dishId ? { ...i, servings: servings * 2, extraFor: tomorrow } : i)) });
+  return tomorrow;
+}
+
+/** Meals in the freezer: [{ id, dishId, meals, addedAt }]. */
+export function freezer() {
+  return (state.settings.freezer || []).filter((f) => f.meals > 0 && state.dishes.get(f.dishId));
+}
+
+export async function addToFreezer(dishId, meals = 1) {
+  const list = [...(state.settings.freezer || [])];
+  const existing = list.find((f) => f.dishId === dishId);
+  if (existing) existing.meals += meals;
+  else list.push({ id: db.newId("fz-"), dishId, meals, addedAt: Date.now() });
+  await saveSettings({ freezer: list.filter((f) => f.meals > 0) });
+}
+
+export async function takeFromFreezer(dishId, meals = 1) {
+  const list = (state.settings.freezer || []).map((f) => (f.dishId === dishId ? { ...f, meals: f.meals - meals } : f));
+  await saveSettings({ freezer: list.filter((f) => f.meals > 0) });
+}
+
+/** Puts a freezer meal in a spot: nothing to buy for it. */
+export async function planFromFreezer(date, meal, dishId) {
+  const key = typeof date === "string" ? date : dateKey(date);
+  const slot = getSlot(key, meal) || { date: key, meal, items: [], choices: [] };
+  await saveSlot({ ...slot, items: [{ dishId, servings: state.settings.servings || 4, fromFreezer: true }], choices: [] });
+  await takeFromFreezer(dishId);
 }
 
 export async function setSlotDishes(date, meal, dishIds, { append = false } = {}) {

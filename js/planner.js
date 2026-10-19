@@ -106,3 +106,74 @@ export function fillWithFavorites({ dishes, empty, wishes = [], recentIds = new 
   }
   return result;
 }
+
+/**
+ * A few dishes to swap in for a meal: ones that suit it, favorites and
+ * well-liked first, the same kind of food a little ahead, never the ones in
+ * exclude. random() picks among close scores, so "more ideas" shows others.
+ */
+export function suggestDishes(dishes, { meal, exclude = new Set(), cuisine = "", cuisineOf = () => "", count = 4, random = Math.random }) {
+  const fits = (d) => (d.meals?.length ? d.meals : ["dinner"]).includes(meal) && !exclude.has(d.id);
+  const main = (d) => meal === "snack" || !(d.categories || []).includes("side");
+  return dishes
+    .filter((d) => fits(d) && main(d))
+    .map((d) => ({
+      d,
+      score: (isFavorite(d) ? 3 : 0) + (averageRating(d) ?? 2) + (cuisine && cuisineOf(d) === cuisine ? 1.5 : 0) + random() * 2.5,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, count)
+    .map((x) => x.d);
+}
+
+// ---------- Calendar ----------
+
+const MEAL_TIMES = { breakfast: ["0730", "0800"], lunch: ["1200", "1230"], snack: ["1530", "1545"], dinner: ["1800", "1900"] };
+
+const icsText = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+
+// Lines longer than 75 bytes are folded: a line break and a space.
+function fold(line) {
+  const bytes = new TextEncoder().encode(line);
+  if (bytes.length <= 75) return line;
+  const out = [];
+  let chunk = "";
+  let size = 0;
+  for (const ch of line) {
+    const n = new TextEncoder().encode(ch).length;
+    if (size + n > (out.length ? 74 : 75)) {
+      out.push(chunk);
+      chunk = "";
+      size = 0;
+    }
+    chunk += ch;
+    size += n;
+  }
+  out.push(chunk);
+  return out.join("\r\n ");
+}
+
+/**
+ * A calendar file (.ics) with one event per planned meal, at the family's usual
+ * time and in the phone's own time zone. entries: [{ date, meal, title, detail }].
+ */
+export function weekCalendar(entries, { now = new Date() } = {}) {
+  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Family Menu//Meals//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  for (const e of entries) {
+    const day = dateKey(e.date).replace(/-/g, "");
+    const [from, to] = MEAL_TIMES[e.meal] || MEAL_TIMES.dinner;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${day}-${e.meal}@family-menu`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART:${day}T${from}00`,
+      `DTEND:${day}T${to}00`,
+      `SUMMARY:${icsText(e.title)}`,
+      ...(e.detail ? [`DESCRIPTION:${icsText(e.detail)}`] : []),
+      "END:VEVENT",
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return lines.map(fold).join("\r\n") + "\r\n";
+}

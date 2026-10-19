@@ -63,9 +63,12 @@ test("a family who has the first starters gets the new ones once", () => {
   const fresh = startersToAdd({ starterBatch: undefined, haveSeedKeys: first });
   assert.equal(fresh.length, STARTER_DISHES.filter((d) => d.batch > 1).length);
   assert.ok(fresh.every((d) => d.batch > 1));
-  // A family that joined at batch 2 gets just batch 3.
+  // A family that joined at batch 2 gets batches 3 and 4; one at batch 3 gets just batch 4.
   const two = new Set(STARTER_DISHES.filter((d) => d.batch <= 2).map((d) => d.seedKey));
-  assert.ok(startersToAdd({ starterBatch: 2, haveSeedKeys: two }).every((d) => d.batch === 3));
+  assert.ok(startersToAdd({ starterBatch: 2, haveSeedKeys: two }).every((d) => d.batch >= 3));
+  const three = new Set(STARTER_DISHES.filter((d) => d.batch <= 3).map((d) => d.seedKey));
+  const four = startersToAdd({ starterBatch: 3, haveSeedKeys: three });
+  assert.ok(four.length >= 30 && four.every((d) => d.batch === 4));
   // Already up to date: nothing.
   assert.equal(startersToAdd({ starterBatch: LATEST_STARTER_BATCH, haveSeedKeys: first }).length, 0);
 });
@@ -79,6 +82,16 @@ test("deleted starters don't come back, and saying no to starters is remembered"
   // A new batch-2 dish they already have isn't added twice.
   const withTuna = new Set([...some, "tuna-mayo-bowl"]);
   assert.ok(!startersToAdd({ starterBatch: 1, haveSeedKeys: withTuna }).some((d) => d.seedKey === "tuna-mayo-bowl"));
+});
+
+test("the newest starters are mostly Korean and Korean fusion, kid-friendly, some spicy", () => {
+  const four = STARTER_DISHES.filter((d) => d.batch === 4);
+  assert.ok(four.every((d) => d.cuisine === "korean" || d.cuisine === "fusion"));
+  assert.ok(four.filter((d) => d.cuisine === "fusion").length >= 8);
+  assert.ok(four.filter((d) => d.spicy > 0).length >= 10, "spicy dishes for the kids who like it hot");
+  assert.ok(four.filter((d) => d.spicy === 0).length >= 10);
+  assert.ok(four.every((d) => d.healthyTip), "every new dish says how to make it healthier");
+  assert.ok(four.filter((d) => d.videoUrl).length >= 30);
 });
 
 test("Discover ideas are complete and not repeated", () => {

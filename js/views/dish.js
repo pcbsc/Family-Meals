@@ -2,14 +2,18 @@
 // that rescale the ingredients, and Cook-along: one big step at a time with timers.
 import {
   h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
-  minutesText, clearChildren, openSheet,
+  minutesText, clearChildren, openSheet, once,
 } from "../ui.js";
 import { SPICE, CUISINES, cuisineOf } from "../seed.js";
-import { scaleIngredient, parseIngredient, findTimers, cleanLink } from "../recipe.js";
+import {
+  scaleIngredient, parseIngredient, findTimers, cleanLink, cookedLines, toMetric, metricText, SPICE_LEVELS, keyIngredients,
+  isChiliLine, haveCovers, normalizeItemName,
+} from "../recipe.js";
 import { dateKey } from "../planner.js";
 import { videoInfo } from "../video.js";
 import {
-  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh, addRecipeToShopping,
+  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh, addRecipeToShopping, cookPrefs, saveSettings,
+  addToFreezer,
 } from "../store.js";
 import {
   grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet,
@@ -186,26 +190,83 @@ async function videoSheet(dish) {
   }, { title: dish.videoUrl ? "📺 Change the video" : "📺 Add a video" });
 }
 
+/** The ingredient lines to show: our way (healthier, spice level), scaled, in our units. */
+function shownLines(dish, factor) {
+  const prefs = cookPrefs();
+  const cooked = cookedLines(dish, prefs);
+  const fix = (line) => {
+    const scaled = scaleIngredient(line, factor);
+    return prefs.metric ? toMetric(scaled) : scaled;
+  };
+  return {
+    ...cooked,
+    prefs,
+    lines: cooked.lines.map((l) => ({ ...l, header: parseIngredient(l.line).header, text: fix(l.line) })),
+    step: (text) => (prefs.metric ? metricText(text) : text),
+  };
+}
+
+/** Healthy, how spicy, cups or grams: one tap each, saved for the family. */
+function cookWay(dish, onchange) {
+  const prefs = cookPrefs();
+  const set = async (patch) => {
+    await saveSettings(patch);
+    onchange();
+  };
+  const hot = dish.spicy > 0 || dish.ingredients.some(isChiliLine);
+  return h("div.cook-way",
+    h(`button.way${prefs.healthy ? ".on" : ""}`, {
+      "aria-pressed": String(prefs.healthy),
+      onclick: () => set({ healthy: !prefs.healthy }),
+    }, "🥗 Healthy"),
+    hot || prefs.spice === "spicy"
+      ? h("div.way-group", { role: "group", "aria-label": "How spicy" }, SPICE_LEVELS.map((lvl) =>
+        h(`button.way${prefs.spice === lvl.key ? ".on" : ""}`, {
+          "aria-pressed": String(prefs.spice === lvl.key),
+          onclick: () => set({ spice: lvl.key }),
+        }, lvl.emoji, " ", lvl.label)))
+      : null,
+    h(`button.way${prefs.metric ? ".on" : ""}`, {
+      "aria-pressed": String(prefs.metric),
+      "aria-label": prefs.metric ? "Show cups and pounds" : "Show grams and ml",
+      onclick: () => set({ metric: !prefs.metric }),
+    }, prefs.metric ? "⚖️ Grams" : "🥄 Cups"),
+  );
+}
+
 export function viewDish({ match }) {
   const dish = state.dishes.get(match[1]);
   if (!dish) return notFound();
   let servings = servingsMemory.get(dish.id) || dish.servings || state.settings.servings || 4;
   const checked = new Set();
   const list = h("ul.ingredients");
+  const way = h("div");
+  const stepList = h("div");
+  const tipBox = h("div");
   const drawIngredients = () => {
     clearChildren(list);
-    const factor = servings / (dish.servings || servings);
-    dish.ingredients.forEach((line, i) => {
-      const p = parseIngredient(line);
-      if (p.header) return list.append(h("li.ing-header", p.item));
-      const text = scaleIngredient(line, factor);
-      list.append(h(`li.ing${checked.has(i) ? ".done" : ""}`,
+    clearChildren(way);
+    clearChildren(stepList);
+    clearChildren(tipBox);
+    const shown = shownLines(dish, servings / (dish.servings || servings));
+    way.append(cookWay(dish, drawIngredients));
+    if (shown.swaps.length) way.append(h("p.way-note", "🥗 Healthier: ", shown.swaps.join(", ")));
+    shown.lines.forEach((l, i) => {
+      if (l.header) return list.append(h("li.ing-header", parseIngredient(l.line).item));
+      const tag = l.off ? h("span.ing-tag.off", "skip for mild") : l.label ? h("span.ing-tag", "🥗 ", l.label) : null;
+      list.append(h(`li.ing${checked.has(i) ? ".done" : ""}${l.off ? ".off" : ""}`,
         h("button.ing-btn", {
           "aria-pressed": checked.has(i) ? "true" : "false",
+          title: l.was ? `Recipe says: ${l.was}` : null,
           onclick: () => { checked.has(i) ? checked.delete(i) : checked.add(i); drawIngredients(); },
-        }, h("span.check", checked.has(i) ? "✓" : ""), h("span", text)),
+        }, h("span.check", checked.has(i) ? "✓" : ""), h("span", l.text, tag ? " " : "", tag)),
       ));
     });
+    stepList.append(dish.steps.length
+      ? h("ol.steps", dish.steps.map((s) => h("li", shown.step(s))))
+      : h("p.muted", "No steps yet."));
+    const tips = [...shown.tips.map(shown.step), dish.notes ? shown.step(dish.notes) : ""].filter(Boolean);
+    if (tips.length) tipBox.append(h("section.card.notes", h("h2", "💡 Tips"), tips.map((t) => h("p", t))));
   };
   drawIngredients();
   const total = (dish.prepMinutes || 0) + (dish.cookMinutes || 0);
@@ -254,6 +315,7 @@ export function viewDish({ match }) {
           onchange: (n) => { servings = n; servingsMemory.set(dish.id, n); drawIngredients(); },
         })),
       ),
+      dish.ingredients.length ? way : null,
       dish.ingredients.length ? list : h("p.muted", "No ingredients yet."),
       dish.ingredients.length
         ? h("button.btn.soft.wide", {
@@ -266,18 +328,38 @@ export function viewDish({ match }) {
     ),
     h("section.card",
       h("h2", "👣 Steps"),
-      dish.steps.length
-        ? h("ol.steps", dish.steps.map((s) => h("li", s)))
-        : h("p.muted", "No steps yet."),
+      stepList,
     ),
-    dish.notes ? h("section.card.notes", h("h2", "💡 Tips"), h("p", dish.notes)) : null,
-    dish.videoUrl ? null : h("button.btn.ghost.center-btn", { onclick: () => videoSheet(dish) }, "📺 Add a video"),
+    tipBox,
+    h("div.row.wrap.center.no-print",
+      dish.videoUrl ? null : h("button.btn.ghost", { onclick: () => videoSheet(dish) }, "📺 Add a video"),
+      h("button.btn.ghost", { onclick: () => window.print() }, "🖨️ Print recipe card"),
+    ),
     sourceLine(dish),
     dish.timesCooked ? h("p.muted.center", `We've cooked this ${dish.timesCooked} time${dish.timesCooked === 1 ? "" : "s"}! 🎉`) : null,
   );
 }
 
 // ---------- Cook-along ----------
+
+/** After cooking: tap what got used up, and it comes off "what we have". */
+function usedUp(dish) {
+  const need = keyIngredients(dish);
+  const have = (state.settings.have || []).filter((x) => [...need].some((k) => haveCovers(normalizeItemName(x), k)));
+  if (!have.length) return null;
+  const box = h("section.card.stack.used-up",
+    h("h3", "Did we use anything up?"),
+    h("p.muted.small", "Tap it and it comes off our \"what we have\" list."),
+    h("div.row.wrap", have.map((item) => h("button.chip", {
+      onclick: async (e) => {
+        await saveSettings({ have: (state.settings.have || []).filter((x) => x !== item) });
+        e.currentTarget.remove();
+        toast(`Okay, no more ${item}.`, { emoji: "🧺" });
+      },
+    }, `${item} ✕`))),
+  );
+  return box;
+}
 
 const GROWN_UP = /\b(knife|cut|slice|chop|dice|mince|grate|boil|fry|fried|oven|sear|blanch|hot|drain|blend|simmer|stove|pan|bake|roast|grill|broil|steam|skillet|pot)/i;
 
@@ -320,8 +402,8 @@ export function viewCook({ match, params, setCleanup }) {
   const dish = state.dishes.get(match[1]);
   if (!dish) return notFound();
   const servings = Number(params.get("s")) || dish.servings || 4;
-  const factor = servings / (dish.servings || servings);
-  const steps = dish.steps;
+  const shown = shownLines(dish, servings / (dish.servings || servings));
+  const steps = dish.steps.map(shown.step);
   const last = steps.length + 1;
   let index = 0;
   const stage = h("div.cook-stage");
@@ -353,7 +435,7 @@ export function viewCook({ match, params, setCleanup }) {
 
   const readAloud = () => {
     const text = index === 0
-      ? "Let's get ready! Gather these: " + dish.ingredients.map((l) => scaleIngredient(l, factor)).join(", ")
+      ? "Let's get ready! Gather these: " + shown.lines.filter((l) => !l.header && !l.off).map((l) => l.text).join(", ")
       : index === last ? "You did it! Great job!" : `Step ${index}. ${steps[index - 1]}`;
     if (!speak(text)) toast("This device can't read aloud.", { emoji: "🔇" });
   };
@@ -367,7 +449,7 @@ export function viewCook({ match, params, setCleanup }) {
     nextBtn.style.visibility = index === last ? "hidden" : "visible";
     nextBtn.textContent = index === last - 1 ? "Finish 🎉" : index === 0 ? "Let's cook ▶" : "Next ▶";
     if (index === 0) {
-      const lines = dish.ingredients.map((l, n) => ({ line: l, n })).filter(({ line }) => !parseIngredient(line).header);
+      const lines = shown.lines.map((l, n) => ({ line: l.text, n })).filter(({ n }) => !shown.lines[n].header && !shown.lines[n].off);
       stage.append(
         h("h2.cook-title", "🧺 Get ready!"),
         h("p.cook-sub", `Gather everything for ${servings} people. Tap each one when you have it.`),
@@ -379,7 +461,7 @@ export function viewCook({ match, params, setCleanup }) {
                 li.classList.toggle("done");
                 li.querySelector(".check").textContent = gathered.has(n) ? "✓" : "";
               },
-            }, h("span.check", gathered.has(n) ? "✓" : ""), h("span", scaleIngredient(line, factor))));
+            }, h("span.check", gathered.has(n) ? "✓" : ""), h("span", line)));
           return li;
         })),
       );
@@ -401,6 +483,13 @@ export function viewCook({ match, params, setCleanup }) {
             },
           }, "📷 Take a picture"),
           h("button.btn.soft.big", { onclick: () => rateSheet(dish) }, "⭐ How was it?"),
+          h("button.btn.soft", {
+            onclick: once(async () => {
+              await addToFreezer(dish.id, 1);
+              toast(`${dish.name} is in the freezer list. Plan it any night!`, { emoji: "🧊" });
+            }),
+          }, "🧊 We froze some for later"),
+          usedUp(dish),
           h("button.btn.ghost", { onclick: () => go(`#/dish/${dish.id}`, { replace: true }) }, "Back to the recipe"),
         ),
       );
