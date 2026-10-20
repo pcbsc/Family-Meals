@@ -76,6 +76,16 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
   of a cookbook page or a screenshot, paste a caption, or write our own.
 - **📺 Videos**: a dish can have a YouTube, TikTok or Instagram video. It plays right on the
   dish page, and in **Cook together** the 📺 button keeps it above the steps while you cook.
+- **📚 How long does food last?** (Menu, and the fridge screen): 104 foods, from apples to
+  kimchi, gochujang, tteok and banchan, each with how long it keeps in the fridge, freezer and
+  pantry, how to store and freeze it, why (kid-friendly), and how to tell it's gone bad, with
+  sources (USDA FoodKeeper/FoodSafety.gov, FDA, university extension services; Korean makers and
+  cooks for Korean foods). Most were looked up twice, separately, and use the more cautious
+  official time where sources disagree. Plus the food safety rules every family should know
+  (the 2-hour rule, 40°F/0°F, reheating to 165°F, thawing) and **🎮 Where does it go?**, a quiz
+  for kids. "What we have" now uses each food's own shelf life ("good till Thu"), **Done
+  shopping** shows where everything goes, recipes say how long their leftovers keep, frozen
+  meals show a best-by date, and Today has a **💡 Did you know?** food fact.
 - **🙋 I want to eat…**: kids make wishes from a dozen big pictures (or say it with 🎤 where
   the browser can listen), and the grown-ups see them when planning.
 
@@ -304,6 +314,7 @@ A static web app with no build step. Open `index.html` through any web server.
 | `sw.js`, `manifest.webmanifest` | Offline support and the Android share target |
 | `img/canva/` | Pictures from our Canva design "Family Menu phone app screens": the tomato mascot, animal stickers, meal and button icons |
 | `vendor/` | The official Anthropic SDK bundled as one module |
+| `js/storage.js`, `js/storage-data.js`, `js/views/keep.js` | The food storage guide: matching ingredient names to it, the data with sources, and the guide screen and quiz |
 | `js/native.js` | In the Android app only: files, sharing, reading aloud and keep-awake through Capacitor plugins, and posts shared from other apps |
 | `android/`, `capacitor.config.json` | The Android app ([Capacitor](https://capacitorjs.com)): `SharedTextPlugin.java` receives the Share menu |
 | `.github/workflows/android.yml` | Builds and signs the APK on every push to `main` and publishes it as the `app-latest` release |

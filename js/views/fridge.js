@@ -20,7 +20,10 @@ const COMMON = [
 const emojiFor = (item) => COMMON.find(([, name]) => normalizeItemName(name) === normalizeItemName(item))?.[0] || "🧺";
 
 /** "Tue" this week, "Oct 12" before. */
-const dayText = (at) => prettyDate(new Date(at), Math.abs(Date.now() - at) < 6 * 24 * 3600 * 1000 ? { weekday: "short" } : { month: "short", day: "numeric" });
+const dayText = (at) => {
+  const days = Math.abs(Date.now() - at) / (24 * 3600 * 1000);
+  return prettyDate(new Date(at), days < 6 ? { weekday: "short" } : days < 300 ? { month: "short", day: "numeric" } : { month: "short", year: "numeric" });
+};
 
 export function viewFridge() {
   const haveBox = h("div.stack.have-list");

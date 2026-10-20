@@ -43,6 +43,9 @@ export function foodSheet(food, { onRemove, title } = {}) {
     food.why ? h("section.keep-section.keep-why", h("h4", "💡 Why?"), h("p", food.why)) : null,
     food.spoiled ? h("section.keep-section", h("h4", "👃 It's gone bad if…"), h("p", food.spoiled)) : null,
     h("p.muted.small", "Fridge times are for 40°F (4°C) or colder. Freezer times are for best taste: at 0°F (-18°C) food stays safe, just less tasty after that. When in doubt, throw it out."),
+    h("p.muted.small", food.checked === "two"
+      ? "✔✔ Looked up twice, separately; where sources disagreed, this is the more cautious official time."
+      : "✔ Looked up once. If the package gives a date or storage advice, follow that."),
     food.sources?.length
       ? h("p.muted.small.keep-sources", "Sources: ", ...food.sources.flatMap((s, i) => [
         i ? " · " : "",
@@ -149,7 +152,7 @@ export function viewKeep({ params }) {
     h("input.search", { type: "search", placeholder: "🔍 Find a food", "aria-label": "Find a food", oninput: (e) => { query = e.target.value; draw(); } }),
     chips,
     list,
-    h("p.muted.small.center", "From USDA FoodKeeper, FoodSafety.gov, the FDA and university extension services. Each number was checked by two researchers separately."),
+    h("p.muted.small.center", "From USDA FoodKeeper, FoodSafety.gov, the FDA and university extension services (and Korean makers and cooks for Korean foods). Most foods were looked up twice, separately; where sources disagreed, the guide uses the more cautious official time."),
   );
 }
 

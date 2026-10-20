@@ -1022,6 +1022,8 @@ await check("We ate it: one sheet for faces, Brave Bites, leftovers and a note",
     const { setSlotDishes, members, setBraveFoods } = await import("./js/store.js");
     const { dateKey, addDays } = await import("./js/planner.js");
     await setSlotDishes(dateKey(addDays(new Date(), -1)), "dinner", ["seed-bibimbap"]);
+    // After 7pm the sheet is for tonight's dinner; keep tonight empty so it's last night's.
+    await setSlotDishes(dateKey(new Date()), "dinner", []);
     await setSlotDishes(dateKey(addDays(new Date(), 1)), "lunch", []);
     await setBraveFoods(members().find((m) => m.kid).id, ["seed-bibimbap"]);
   });
@@ -1108,18 +1110,55 @@ await check("an allergy shows on the recipe and keeps the dish out of the ideas"
   });
 });
 
-await check("what we have: fresh food goes back on the list after a week unless it's still there", async () => {
+await check("what we have: each food keeps as long as the storage guide says, then asks if it's still there", async () => {
   await page.evaluate(async () => {
     const { saveSettings } = await import("./js/store.js");
-    const old = Date.now() - 9 * 24 * 3600 * 1000;
-    await saveSettings({ have: ["carrots", "soy sauce"], haveAt: { carrot: old, "soy sauce": old } });
+    const ago = (days) => Date.now() - days * 24 * 3600 * 1000;
+    await saveSettings({ have: ["spinach", "carrots", "soy sauce"], haveAt: { spinach: ago(6), carrot: ago(9), "soy sauce": ago(9) } });
   });
   await page.goto(BASE + "#/fridge");
-  await page.locator(".stale-have", { hasText: "carrots" }).waitFor();
-  assert.equal(await page.locator(".stale-have", { hasText: "soy sauce" }).count(), 0, "a bottle of soy sauce doesn't go off in a week");
-  await page.getByRole("button", { name: "We still have carrots" }).click();
+  // Spinach keeps 3–5 days; carrots 2–3 weeks; soy sauce a month.
+  await page.locator(".stale-have", { hasText: "spinach" }).waitFor();
+  assert.equal(await page.locator(".stale-have", { hasText: "carrots" }).count(), 0, "carrots keep for weeks");
+  assert.equal(await page.locator(".stale-have", { hasText: "soy sauce" }).count(), 0);
+  await page.locator(".have-chip-wrap", { hasText: "carrots" }).getByText(/good till/).waitFor();
+  await page.getByRole("button", { name: "We still have spinach" }).click();
   await page.waitForFunction(() => !document.querySelector(".stale-have"));
+  // Tap a food to learn how to keep it.
+  await page.getByRole("button", { name: "How to keep carrots" }).click();
+  await sheet().locator(".keep-place", { hasText: "Fridge" }).getByText("2–3 weeks").waitFor();
+  await sheet().getByText("📦 How to keep it").waitFor();
+  await sheet().locator(".keep-sources a").first().waitFor();
+  await closeSheets();
   await page.evaluate(async () => (await import("./js/store.js")).saveSettings({ have: [], haveAt: {} }));
+});
+
+await check("the storage guide: find a food, the safety rules, and the kids' quiz", async () => {
+  await page.goto(BASE + "#/menu");
+  await page.getByRole("button", { name: "📚 How long does food last?" }).click();
+  await page.locator(".keep-row").nth(50).waitFor();
+  assert.ok(await page.locator(".keep-row").count() >= 100);
+  await page.locator(".keep-rules summary").click();
+  await page.locator(".keep-rule-list li", { hasText: "2 hours" }).first().waitFor();
+  await page.getByLabel("Find a food").fill("kimchi");
+  await page.locator(".keep-row", { hasText: "Kimchi" }).click();
+  await sheet().getByText("💡 Why?").waitFor();
+  await sheet().getByText(/Looked up (twice|once)/).waitFor();
+  await closeSheets();
+  // Cooked rice warns to cool it fast.
+  await page.goto(BASE + "#/keep?f=cooked-rice");
+  await sheet().locator(".keep-caution", { hasText: "Bacillus cereus" }).waitFor();
+  await closeSheets();
+  await page.getByRole("button", { name: /Where does it go/ }).click();
+  await sheet().getByText("1 of 5").waitFor();
+  await sheet().getByRole("button", { name: "🥶 Fridge" }).click();
+  await sheet().getByText(/Yes!|Not quite/).waitFor();
+  await closeSheets();
+  // A recipe says how long its leftovers keep; Today has a food fact.
+  await page.goto(BASE + "#/dish/seed-kimchi-jjigae");
+  await page.locator(".leftover-note", { hasText: "Leftovers keep 3–4 days in the fridge" }).waitFor();
+  await page.goto(BASE + "#/today");
+  await page.locator(".did-you-know").waitFor();
 });
 
 await check("done shopping: ticked things go into what we have, and are set aside next time", async () => {
@@ -1130,6 +1169,12 @@ await check("done shopping: ticked things go into what we have, and are set asid
   await pear.locator(".shop-btn").click();
   await page.getByRole("button", { name: "Done shopping" }).click();
   await page.locator(".toast", { hasText: "added to \"what we have\"" }).waitFor();
+  // Where it all goes, and how long it keeps there.
+  const putAway = sheet();
+  await putAway.getByText("Putting it away").waitFor();
+  await putAway.locator(".keep-row", { hasText: "Asian pear" }).waitFor();
+  assert.match(await putAway.innerText(), /Fridge[\s\S]*Keeps \d/);
+  await closeSheets();
   const have = await page.evaluate(async () => (await import("./js/store.js")).state.settings.have);
   assert.ok(have.some((x) => /pear/.test(x)), have.join(", "));
   await page.locator(".have-these").click();
