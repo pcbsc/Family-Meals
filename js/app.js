@@ -2,7 +2,8 @@
 // and keeps the tab bar in step.
 import { h, toast } from "./ui.js";
 import { state, loadAll, setRedraw, saveSettings, go, addNewStarters } from "./store.js";
-import { askToKeepData } from "./db.js";
+import { askToKeepData, putSharedItem } from "./db.js";
+import { isApp, listenForShares } from "./native.js";
 import { viewToday } from "./views/today.js";
 import { viewWeek } from "./views/week.js";
 import { viewMenu, viewDiscover } from "./views/menu.js";
@@ -140,7 +141,13 @@ async function start() {
   render();
   if (fresh.added) toast(`${fresh.added} new recipes are on the menu, with cooking videos!`, { emoji: "🔥", ms: 5000 });
   else if (fresh.videos) toast(`${fresh.videos} of our dishes now have a cooking video.`, { emoji: "📺", ms: 5000 });
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
+  // The Android app has its files built in; the website keeps working offline through the service worker.
+  if (isApp) {
+    listenForShares(async (item) => {
+      await putSharedItem(item);
+      go(`#/add?shared=1&n=${Date.now()}`);
+    });
+  } else if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
 
 start();

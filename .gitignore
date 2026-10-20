@@ -2,3 +2,8 @@ node_modules/
 tests/failure-*
 .DS_Store
 Thumbs.db
+www/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties

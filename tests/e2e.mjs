@@ -1041,6 +1041,75 @@ await check("a broken join link is refused", async () => {
   await page.getByText("This join link looks broken").waitFor();
 });
 
+await check("in the Android app: files, sharing, reading aloud, keep-awake and the Share menu use the app", async () => {
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, serviceWorkers: "block" });
+  await setupRoutes(ctx);
+  // What Capacitor puts on the page inside the Android app.
+  await ctx.addInitScript(() => {
+    const calls = (window.__appCalls = []);
+    const ok = (name, out = {}) => async (args) => { calls.push([name, args]); return out; };
+    let onShared = null;
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      Plugins: {
+        Filesystem: { writeFile: async (a) => { calls.push(["writeFile", a]); return { uri: `file:///cache/${a.path}` }; } },
+        Share: { share: ok("share") },
+        TextToSpeech: { speak: ok("speak"), stop: ok("stop") },
+        KeepAwake: { keepAwake: ok("keepAwake"), allowSleep: ok("allowSleep") },
+        SharedText: { take: async () => ({}), addListener: (event, cb) => { onShared = cb; } },
+      },
+    };
+    window.__shareToApp = (item) => onShared(item);
+  });
+  const p = await ctx.newPage();
+  p.on("pageerror", (e) => errors.push(`app: ${e.message}`));
+  const calls = () => p.evaluate(() => window.__appCalls.map(([name, args]) => ({ name, args })));
+  await p.goto(BASE);
+  await p.getByRole("button", { name: /Let's set up/ }).click();
+  await p.getByText("Next ▶").click();
+  await p.getByText("Yes, add them").click();
+  await p.locator(".meal-cards").waitFor();
+
+  // A backup file opens Android's share sheet instead of a download.
+  await p.goto(BASE + "#/settings");
+  await p.getByText("Save backup file").click();
+  await p.waitForFunction(() => window.__appCalls.some(([n]) => n === "share"));
+  let c = await calls();
+  const saved = c.find((x) => x.name === "writeFile");
+  assert.match(saved.args.path, /^family-menu-backup.*\.json$/);
+  assert.equal(saved.args.encoding, "utf8");
+  assert.ok(JSON.parse(saved.args.data).dishes.length > 100);
+  assert.deepEqual(c.find((x) => x.name === "share").args.files, [`file:///cache/${saved.args.path}`]);
+
+  // "Send the list" goes to the share sheet as text.
+  await p.evaluate(async () => {
+    const { setSlotDishes } = await import("./js/store.js");
+    const { dateKey } = await import("./js/planner.js");
+    await setSlotDishes(dateKey(new Date()), "dinner", ["seed-bulgogi"]);
+  });
+  await p.goto(BASE + "#/shop");
+  await p.getByRole("button", { name: "Send the list" }).click();
+  await p.waitForFunction(() => window.__appCalls.filter(([n]) => n === "share").length === 2);
+  c = await calls();
+  assert.match(c.filter((x) => x.name === "share")[1].args.text, /Ribeye/);
+
+  // Cook-along keeps the screen on and reads steps aloud with Android's voice.
+  await p.goto(BASE + "#/cook/seed-bulgogi?s=4");
+  await p.getByRole("button", { name: "Read it to me" }).click();
+  c = await calls();
+  assert.ok(c.some((x) => x.name === "keepAwake"));
+  await p.waitForFunction(() => window.__appCalls.some(([n]) => n === "speak"));
+  assert.match((await calls()).find((x) => x.name === "speak").args.text, /Gather these/);
+  await p.getByRole("button", { name: "Stop cooking" }).click();
+  await p.waitForFunction(() => window.__appCalls.some(([n]) => n === "allowSleep"));
+
+  // Sharing an Instagram post to the app from Android's Share menu opens Add with it.
+  await p.evaluate(() => window.__shareToApp({ text: "Best kimchi stew https://www.instagram.com/reel/abc123/" }));
+  await p.waitForURL(/#\/add\?shared=1/);
+  await p.waitForFunction(() => document.querySelector(".add textarea")?.value.includes("instagram.com/reel/abc123"));
+  await ctx.close();
+});
+
 await check("no errors in the console", async () => {
   assert.deepEqual(errors, []);
 });

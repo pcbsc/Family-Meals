@@ -89,6 +89,35 @@ your own device and are never uploaded to GitHub.
 3. Open **Family Menu** from the home screen and follow the welcome steps: family
    names and faces, then the starter dishes.
 
+### Or: the real Android app
+
+There is also a proper Android app (an APK) that you install like any other app. It works
+the same as the website, plus: it opens straight from the app drawer, appears in the Share
+menu for links, posts and screenshots, reads recipes aloud with Android's own voice, keeps
+the screen on while cooking, and saves backups and calendar files through Android's share
+sheet (pick **Drive**, **Gmail** or **Files**).
+
+1. On the phone or tablet, open
+   **https://github.com/pcbsc/Family-Meals/releases/download/app-latest/family-menu.apk**
+   in Chrome and download it.
+2. Tap the downloaded file. Android asks to allow installs from Chrome the first time:
+   tap **Settings → Allow from this source**, go back, then **Install**.
+3. If **Play Protect** warns that it doesn't recognize the app, tap **More details →
+   Install anyway**. It warns because the app isn't from the Play Store.
+
+To update, download and install the same link again. Your recipes stay. Every change pushed
+to this repository builds a new version (see the **Actions** tab).
+
+**Moving from the website to the app:** the app keeps its own copy of everything, separate
+from the website. In the website version, tap **⚙️ → 💾 Save backup file**. Then in the
+app, tap **⚙️ → 📂 Restore from file** and paste your Claude key again (keys aren't in
+backups).
+
+**About the signing key:** Android only installs an update if it's signed with the same key
+as the first install, so the key is kept in this repository
+(`android/app/family-menu.keystore`). Because the repository is public, anyone could sign an
+app with it. Only install Family Menu from the link above.
+
 ## 3. Turn on Claude (recommended)
 
 Claude is the AI helper that turns links, Instagram/TikTok posts and photos into recipe
@@ -245,6 +274,9 @@ A static web app with no build step. Open `index.html` through any web server.
 | `sw.js`, `manifest.webmanifest` | Offline support and the Android share target |
 | `img/canva/` | Pictures from our Canva design "Family Menu phone app screens": the tomato mascot, animal stickers, meal and button icons |
 | `vendor/` | The official Anthropic SDK bundled as one module |
+| `js/native.js` | In the Android app only: files, sharing, reading aloud and keep-awake through Capacitor plugins, and posts shared from other apps |
+| `android/`, `capacitor.config.json` | The Android app ([Capacitor](https://capacitorjs.com)): `SharedTextPlugin.java` receives the Share menu |
+| `.github/workflows/android.yml` | Builds and signs the APK on every push to `main` and publishes it as the `app-latest` release |
 
 ```sh
 npm install        # dev tools only: esbuild, Playwright, the SDK source
@@ -255,6 +287,8 @@ npm run e2e        # drives the app in Chromium with Claude's API mocked
 npm run vendor     # rebuild vendor/anthropic-sdk.mjs and the font after an upgrade
 npm run icons      # re-render icons/*.png from icons/icon.svg
 npm run serve      # http://localhost:8080
+npm run www        # copy the files in sw.js's APP_FILES into www/ for the app
+npm run android:sync   # www/ plus `cap sync`; then `cd android && ./gradlew assembleRelease`
 ```
 
 Claude calls go from the browser straight to the API with the family's key

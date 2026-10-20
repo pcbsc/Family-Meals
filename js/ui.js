@@ -1,6 +1,7 @@
 // Small UI toolkit: an element builder, bottom sheets that close with
 // Android's back gesture, toasts, a grown-up PIN pad, confetti, and photo
 // resizing.
+import { isApp, shareFile, appSpeak, appStopSpeaking, appKeepAwake } from "./native.js";
 
 /** h("button.btn.primary", { onclick }, "Save") — tag.class#id, props, children. */
 export function h(spec, props, ...children) {
@@ -346,6 +347,7 @@ export function ding(times = 3) {
 }
 
 export function speak(text) {
+  if (appSpeak(text)) return true;
   if (!("speechSynthesis" in window)) return false;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
@@ -355,8 +357,14 @@ export function speak(text) {
   return true;
 }
 
+export function stopSpeaking() {
+  appStopSpeaking();
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+
 let wakeLock = null;
 export async function keepScreenOn(on) {
+  if (appKeepAwake(on)) return;
   try {
     if (on && "wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
     else if (!on && wakeLock) {
@@ -383,6 +391,11 @@ export function minutesText(n) {
 }
 
 export function downloadFile(name, content, type = "application/json") {
+  // In the Android app there's no Downloads link: save it and open the share sheet.
+  if (isApp) {
+    shareFile(name, content).catch((err) => toast(`Couldn't save the file: ${err.message || err}`, { emoji: "😕" }));
+    return;
+  }
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = h("a", { href: url, download: name });
   document.body.append(a);

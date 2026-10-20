@@ -1,0 +1,67 @@
+# Builds the Android app on GitHub's computers every time main changes, and puts
+# the newest one at the same link every time:
+# https://github.com/pcbsc/Family-Meals/releases/download/app-latest/family-menu.apk
+name: Android app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-app
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Copy the app into the Android project
+        run: npm run android:sync
+
+      - name: Build the app
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Name it
+        run: cp android/app/build/outputs/apk/release/app-release.apk family-menu.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: family-menu-apk
+          path: family-menu.apk
+
+      - name: Put it on the "Family Menu app" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete app-latest --yes --cleanup-tag || true
+          gh release create app-latest family-menu.apk \
+            --target "${{ github.sha }}" \
+            --title "Family Menu app (version 1.0.${{ github.run_number }})" \
+            --notes "Open this page on the Android phone or tablet and tap **family-menu.apk** to download it, then open the file to install. The first time, Android asks to allow installing apps from your browser or Files app; say yes. New versions install over the old one and keep all your recipes and photos."

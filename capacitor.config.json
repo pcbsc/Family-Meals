@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.pcbsc.familymenu",
+  "appName": "Family Menu",
+  "webDir": "www",
+  "backgroundColor": "#fff8ee",
+  "android": {
+    "backgroundColor": "#fff8ee"
+  }
+}

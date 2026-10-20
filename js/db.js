@@ -186,6 +186,14 @@ function openInbox() {
   });
 }
 
+/** The Android app puts things from the Share menu here too. */
+export async function putSharedItem(item) {
+  const db = await openInbox();
+  const tx = db.transaction("shared", "readwrite");
+  tx.objectStore("shared").put({ id: `app-${Date.now()}`, at: Date.now(), ...item });
+  await done(tx);
+}
+
 export async function takeSharedItem() {
   const db = await openInbox();
   const items = await result(db.transaction("shared").objectStore("shared").getAll());

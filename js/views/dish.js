@@ -2,7 +2,7 @@
 // that rescale the ingredients, and Cook-along: one big step at a time with timers.
 import {
   h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
-  minutesText, clearChildren, openSheet, once,
+  minutesText, clearChildren, openSheet, once, stopSpeaking,
 } from "../ui.js";
 import { SPICE, CUISINES, cuisineOf } from "../seed.js";
 import {
@@ -541,7 +541,7 @@ export function viewCook({ match, params, setCleanup }) {
   setCleanup(() => {
     document.removeEventListener("visibilitychange", wake);
     keepScreenOn(false);
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    stopSpeaking();
   });
   show(0);
   return h("div.screen.cook",

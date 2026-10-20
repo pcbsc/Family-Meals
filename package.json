@@ -2,7 +2,7 @@
   "name": "family-meals",
   "private": true,
   "version": "1.0.0",
-  "description": "Family Menu: weekly meal planner and recipe box. A static web app; nothing here is needed to run it.",
+  "description": "Family Menu: weekly meal planner and recipe box. A static web app (no build step) that also ships as an Android app through Capacitor.",
   "type": "module",
   "scripts": {
     "vendor": "node tools/vendor.mjs",
@@ -11,12 +11,23 @@
     "fuzz": "FUZZ_RUNS=30000 node --test tests/unit/fuzz.test.mjs",
     "lint": "eslint js sw.js tools tests",
     "e2e": "node tests/e2e.mjs",
-    "serve": "npx http-server -p 8080 -c-1 ."
+    "serve": "npx http-server -p 8080 -c-1 .",
+    "www": "node tools/build-www.mjs",
+    "android:sync": "npm run www && npx cap sync android"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.135.0",
+    "@capacitor/cli": "8.5.3",
     "@fontsource-variable/nunito": "5.2.6",
     "esbuild": "0.28.2",
     "playwright": "1.56.1"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "8.0.1",
+    "@capacitor-community/text-to-speech": "8.0.2",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/share": "8.0.3"
   }
 }

@@ -1,7 +1,7 @@
 // Service worker: keeps the app working without internet, and receives
 // recipes shared from other apps (Android's Share menu → Family Menu).
 // Bump VERSION when the list of app files changes.
-const VERSION = "v6";
+const VERSION = "v7";
 const APP_CACHE = `family-menu-app-${VERSION}`;
 const IMAGE_CACHE = "family-menu-images";
 
@@ -21,6 +21,7 @@ const APP_FILES = [
   "./js/ai.js",
   "./js/video.js",
   "./js/share.js",
+  "./js/native.js",
   "./js/seed-fusion.js",
   "./js/views/today.js",
   "./js/views/week.js",
