@@ -8,6 +8,10 @@ import { dateKey, fromKey, addDays, weekStart, weekDays } from "../planner.js";
 import { state, getSlot, slotDishes, shoppingFor, saveShopping, saveSettings, cookPrefs, go, db } from "../store.js";
 import { shareConfig, readList, writeList, startList, tickId, extraId } from "../share.js";
 import { MEALS } from "../seed.js";
+import { icon, dishArt } from "../components.js";
+
+// Aisle pictures from the Canva design; the other aisles keep their emoji.
+const AISLE_ICONS = { produce: "aisle-produce", meat: "aisle-meat", dairy: "aisle-dairy", asian: "aisle-asian" };
 
 // The last copy of the shared list, so the screen opens instantly (and works offline).
 let lastRemote = null;
@@ -242,7 +246,7 @@ export function viewShop({ params, setCleanup }) {
             : !remote ? "⏳ Getting the shared list…"
               : member ? "📱 Shared list from the family's planning phone. Ticks show up on both phones."
                 : "📱 Shared with the family. Ticks show up on both phones.";
-      body.append(h(`p.share-note${problem ? ".warn" : ""}`, { role: "status" }, note));
+      body.append(h(`p.share-note${problem ? ".warn" : ""}`, { role: "status" }, problem ? null : icon("phone"), h("span", note)));
     }
 
     if (!member && !mine.planned.length && !mine.added.length && !list.extras.length) {
@@ -263,7 +267,7 @@ export function viewShop({ params, setCleanup }) {
         h("p.muted", `${toBuy} thing${toBuy === 1 ? "" : "s"} to buy, all combined and sorted by aisle.`,
           cookPrefs().healthy ? " 🥗 With healthy swaps." : ""),
         h("div.row.wrap",
-          [...counts.values()].map(({ dish, times }) => h("span.chip.static", `📅 ${dish.name}${times > 1 ? ` ×${times}` : ""}`)),
+          [...counts.values()].map(({ dish, times }) => h("span.chip.static.dish-chip", dishArt(dish, { className: "art-chip" }), `${dish.name}${times > 1 ? ` ×${times}` : ""}`)),
           mine.added.map(({ dish, servings }) => h("button.chip.on", {
             "aria-label": `Take ${dish.name} off the list`,
             onclick: async () => {
@@ -289,9 +293,9 @@ export function viewShop({ params, setCleanup }) {
           h("span.check", done ? "✓" : ""),
           h("span.shop-text",
             h("span.shop-name", item.name),
-            item.amount ? h("span.shop-amount", item.amount) : null,
-            dishes ? h("span.shop-for", dishes) : null,
+            dishes ? h("span.shop-for", `for ${dishes}`) : null,
           ),
+          item.amount ? h("span.shop-amount", item.amount) : null,
         ),
       );
     };
@@ -306,7 +310,7 @@ export function viewShop({ params, setCleanup }) {
       const extras = aisle.key === "other" ? list.extras : [];
       if (!inAisle.length && !extras.length) continue;
       body.append(h(`section.card.aisle.aisle-${aisle.key}`,
-        h("h2", aisle.emoji, " ", aisle.label),
+        h("h2", AISLE_ICONS[aisle.key] ? icon(AISLE_ICONS[aisle.key], "aisle-icon") : h("span.aisle-emoji", aisle.emoji), aisle.label),
         h("ul.shop-list", inAisle.map(row), extras.map(extraRow)),
       ));
     }
@@ -315,7 +319,7 @@ export function viewShop({ params, setCleanup }) {
     const have = items.filter((i) => i.have && !i.pantry);
     if (have.length) {
       body.append(h("details.card.aisle.have-these",
-        h("summary", h("h2", "✅ We have these"), h("span.muted", `${have.length} thing${have.length === 1 ? "" : "s"} already at home`)),
+        h("summary", h("h2", icon("check-green", "summary-icon"), "We have these"), h("span.muted", `${have.length} thing${have.length === 1 ? "" : "s"} already at home`)),
         h("ul.shop-list", have.map((item) => h("li.shop-item",
           h("span.shop-text.grow", h("span.shop-name", item.name), item.amount ? h("span.shop-amount", item.amount) : null),
           member ? null : h("button.btn.soft.small", {
@@ -351,24 +355,24 @@ export function viewShop({ params, setCleanup }) {
     };
     input.addEventListener("keydown", (e) => e.key === "Enter" && addExtra());
     const tickedCount = items.filter((i) => list.ticked(i.key)).length + list.extras.filter((x) => x.checked).length;
-    body.append(
+    body.append(...[
       h("div.row", input, h("button.btn.primary", { "aria-label": "Add", onclick: addExtra }, "➕")),
-      tickedCount
-        ? h("button.btn.cook.wide", {
+      // From the Canva design: Done shopping and Send the list side by side.
+      h("div.shop-actions",
+        h("button.btn.cook.shop-done", {
           onclick: async () => {
+            if (!tickedCount) return toast("Tick what you bought first, then tap Done shopping.", { emoji: "☝️" });
             const names = boughtNames(items, list.extras, list.ticked);
             await list.done(names);
             toast(names.length ? `All put away! ${names.length} thing${names.length === 1 ? "" : "s"} added to "what we have".` : "All done!", { emoji: "🏠" });
             draw();
           },
-        }, "🏠 Done shopping")
-        : null,
-      h("div.row.wrap",
-        h("button.btn.primary.grow", { onclick: () => sendList(items, list) }, "📤 Send the list"),
-        h("button.btn.ghost", { onclick: redrawAfter(() => list.untickAll()) }, "Untick all"),
+        }, icon("home-white"), "Done shopping"),
+        h("button.btn.primary.shop-send", { onclick: () => sendList(items, list) }, icon("share-white"), "Send the list"),
       ),
+      tickedCount ? h("button.btn.ghost.center-btn", { onclick: redrawAfter(() => list.untickAll()) }, "Untick all") : null,
       shared ? null : h("p.muted.small.center", h("a", { href: "#/settings" }, "📱 Share this list with another phone")),
-    );
+    ].filter(Boolean));
 
     if (shared && remote && !problem) {
       sendLocal(shop);
@@ -389,7 +393,7 @@ export function viewShop({ params, setCleanup }) {
   }
 
   return h("div.screen.shop",
-    h("header.top", h("h1", "🛒 Shopping list")),
+    h("header.top.shop-top", icon("cart", "shop-cart"), h("h1.grow", "Shopping list"), icon("mascot-thumb", "shop-mascot")),
     member ? null : h("div.week-nav",
       h("button.icon-btn", { "aria-label": "Last week", onclick: () => go(`#/shop?w=${dateKey(addDays(start, -7))}`, { replace: true }) }, "◀"),
       h("div.week-range", h("strong", `${prettyDate(start, { month: "short", day: "numeric" })} – ${prettyDate(addDays(start, 6), { month: "short", day: "numeric" })}`)),

@@ -164,7 +164,9 @@ export function toast(message, { emoji = "✅", ms = 2600, action = null } = {})
     t.classList.remove("show");
     setTimeout(() => t.remove(), 300);
   };
-  const t = h("div.toast", { role: "status" }, h("span.toast-emoji", emoji), h("span", message),
+  // An Undo toast gets the tomato from the Canva design.
+  const face = action ? h("img.toast-face", { src: "img/canva/tomato-face.png", alt: "" }) : h("span.toast-emoji", emoji);
+  const t = h(`div.toast${action ? ".with-action" : ""}`, { role: "status" }, face, h("span.grow", message),
     action ? h("button.toast-action", { onclick: () => { hide(); action.onclick(); } }, action.label) : null);
   document.body.append(t);
   requestAnimationFrame(() => t.classList.add("show"));

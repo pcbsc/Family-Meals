@@ -243,6 +243,7 @@ A static web app with no build step. Open `index.html` through any web server.
 | `js/video.js` | Turns YouTube / TikTok / Instagram / Vimeo links into players |
 | `js/seed.js`, `js/seed-fusion.js` | Starter recipes (in batches; batch 4 is Korean and Korean fusion) and the "Ideas from famous cooks" list |
 | `sw.js`, `manifest.webmanifest` | Offline support and the Android share target |
+| `img/canva/` | Pictures from our Canva design "Family Menu phone app screens": the tomato mascot, animal stickers, meal and button icons |
 | `vendor/` | The official Anthropic SDK bundled as one module |
 
 ```sh

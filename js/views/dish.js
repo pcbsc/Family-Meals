@@ -16,7 +16,7 @@ import {
   addToFreezer,
 } from "../store.js";
 import {
-  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet,
+  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet, icon,
 } from "../components.js";
 
 function notFound() {
@@ -61,6 +61,8 @@ function photoStrip(dish) {
     if (ids.length > 1) strip.append(h("span.hero-count", `${ids.length} photos ▸`));
   }
   // One button: Android offers "Camera" or the gallery.
+  // The tomato from the Canva design peeks over the edge of the recipe.
+  strip.append(icon("mascot-peek", "hero-mascot"));
   strip.append(h("div.hero-buttons",
     h("button.btn.photo-btn", { onclick: () => addPhotoFlow(dish) }, "📷 Add photo"),
   ));
@@ -190,6 +192,17 @@ async function videoSheet(dish) {
   }, { title: dish.videoUrl ? "📺 Change the video" : "📺 Add a video" });
 }
 
+/** "1 1/2 cups milk, warm" → { amount: "1 1/2 cups", name: "Milk, warm" }, like the Canva recipe card. */
+function splitAmount(text) {
+  const p = parseIngredient(text);
+  if (p.qty == null || !p.item) return { amount: "", name: text };
+  const at = text.indexOf(p.item);
+  if (at <= 0) return { amount: "", name: text };
+  const amount = text.slice(0, at).replace(/\s+of\s*$/i, "").trim();
+  const name = text.slice(at);
+  return { amount, name: name.charAt(0).toUpperCase() + name.slice(1) };
+}
+
 /** The ingredient lines to show: our way (healthier, spice level), scaled, in our units. */
 function shownLines(dish, factor) {
   const prefs = cookPrefs();
@@ -214,23 +227,24 @@ function cookWay(dish, onchange) {
     onchange();
   };
   const hot = dish.spicy > 0 || dish.ingredients.some(isChiliLine);
+  const SPICE_ICONS = { mild: "smile", medium: "chili", spicy: "flame" };
   return h("div.cook-way",
-    h(`button.way${prefs.healthy ? ".on" : ""}`, {
-      "aria-pressed": String(prefs.healthy),
+    h("button.way-switch", {
+      role: "switch",
+      "aria-checked": String(prefs.healthy),
       onclick: () => set({ healthy: !prefs.healthy }),
-    }, "🥗 Healthy"),
+    }, icon("salad"), h("span.grow", "Healthy"), h(`span.switch${prefs.healthy ? ".on" : ""}`, { "aria-hidden": "true" })),
     hot || prefs.spice === "spicy"
-      ? h("div.way-group", { role: "group", "aria-label": "How spicy" }, SPICE_LEVELS.map((lvl) =>
-        h(`button.way${prefs.spice === lvl.key ? ".on" : ""}`, {
+      ? h("div.segmented.spice", { role: "group", "aria-label": "How spicy" }, SPICE_LEVELS.map((lvl) =>
+        h(`button.seg${prefs.spice === lvl.key ? ".on" : ""}`, {
           "aria-pressed": String(prefs.spice === lvl.key),
           onclick: () => set({ spice: lvl.key }),
-        }, lvl.emoji, " ", lvl.label)))
+        }, icon(SPICE_ICONS[lvl.key]), lvl.label)))
       : null,
-    h(`button.way${prefs.metric ? ".on" : ""}`, {
-      "aria-pressed": String(prefs.metric),
-      "aria-label": prefs.metric ? "Show cups and pounds" : "Show grams and ml",
-      onclick: () => set({ metric: !prefs.metric }),
-    }, prefs.metric ? "⚖️ Grams" : "🥄 Cups"),
+    h("div.segmented.units", { role: "group", "aria-label": "Amounts" },
+      h(`button.seg${prefs.metric ? "" : ".on"}`, { "aria-pressed": String(!prefs.metric), onclick: () => set({ metric: false }) }, icon("spoon"), "Cups"),
+      h(`button.seg${prefs.metric ? ".on" : ""}`, { "aria-pressed": String(prefs.metric), onclick: () => set({ metric: true }) }, icon("scale"), "Grams"),
+    ),
   );
 }
 
@@ -250,16 +264,18 @@ export function viewDish({ match }) {
     clearChildren(tipBox);
     const shown = shownLines(dish, servings / (dish.servings || servings));
     way.append(cookWay(dish, drawIngredients));
-    if (shown.swaps.length) way.append(h("p.way-note", "🥗 Healthier: ", shown.swaps.join(", ")));
+    if (shown.swaps.length) way.append(h("p.way-note", icon("leaf"), h("span", "Healthier: ", shown.swaps.join(", "))));
     shown.lines.forEach((l, i) => {
       if (l.header) return list.append(h("li.ing-header", parseIngredient(l.line).item));
-      const tag = l.off ? h("span.ing-tag.off", "skip for mild") : l.label ? h("span.ing-tag", "🥗 ", l.label) : null;
+      const tag = l.off ? h("span.ing-tag.off", "skip for mild") : l.label ? h("span.ing-tag", l.label) : null;
+      const { amount, name } = splitAmount(l.text);
       list.append(h(`li.ing${checked.has(i) ? ".done" : ""}${l.off ? ".off" : ""}`,
         h("button.ing-btn", {
           "aria-pressed": checked.has(i) ? "true" : "false",
+          "aria-label": l.text,
           title: l.was ? `Recipe says: ${l.was}` : null,
           onclick: () => { checked.has(i) ? checked.delete(i) : checked.add(i); drawIngredients(); },
-        }, h("span.check", checked.has(i) ? "✓" : ""), h("span", l.text, tag ? " " : "", tag)),
+        }, h("span.check", checked.has(i) ? "✓" : ""), h("span.ing-name", name, tag ? " " : "", tag), amount ? h("span.ing-amount", amount) : null),
       ));
     });
     stepList.append(dish.steps.length
@@ -282,14 +298,14 @@ export function viewDish({ match }) {
     }),
     photoStrip(dish),
     h("div.dish-title",
-      h("h1", dish.emoji, " ", dish.name),
+      h("h1", dish.name),
       dish.nameKo ? h("p.ko", dish.nameKo) : null,
       dish.description ? h("p.desc", dish.description) : null,
     ),
     h("div.facts",
-      cuisine ? h("span.fact", cuisine.emoji, " ", cuisine.label) : null,
-      total ? h("span.fact", "⏱️ ", minutesText(total)) : null,
-      h("span.fact", dish.spicy ? "🌶️".repeat(dish.spicy) + " " : "😊 ", SPICE[dish.spicy || 0]),
+      cuisine ? h("span.fact", h("span.fact-emoji", cuisine.emoji), cuisine.label) : null,
+      total ? h("span.fact", icon("clock"), minutesText(total)) : null,
+      h("span.fact", icon(dish.spicy ? "chili" : "smile"), SPICE[dish.spicy || 0]),
     ),
     h("div.dish-actions",
       h(`button.action${dish.favorite ? ".on" : ""}`, {
@@ -299,12 +315,12 @@ export function viewDish({ match }) {
           if (!dish.favorite) confetti(["❤️", "💖", "⭐"]);
           refresh();
         },
-      }, h("span.action-emoji", dish.favorite ? "❤️" : "🤍"), "Favorite"),
-      h("button.action", { onclick: () => rateSheet(dish) }, h("span.action-emoji", "⭐"), "Rate"),
-      h("button.action", { onclick: () => planItSheet(dish) }, h("span.action-emoji", "📅"), "Plan it"),
+      }, dish.favorite ? h("span.action-emoji", "❤️") : icon("heart"), "Favorite"),
+      h("button.action", { onclick: () => rateSheet(dish) }, icon("star"), "Rate"),
+      h("button.action", { onclick: () => planItSheet(dish) }, icon("calendar"), "Plan it"),
     ),
     familyFaces(dish),
-    h("button.btn.cook.big.wide", { onclick: () => go(`#/cook/${dish.id}?s=${servings}`) }, "👩‍🍳 Cook together"),
+    h("button.btn.cook.big.wide.cook-kids", { onclick: () => go(`#/cook/${dish.id}?s=${servings}`) }, icon("chef-kids"), "Cook together"),
     videoCard(dish),
     h("section.card",
       h("div.section-head",

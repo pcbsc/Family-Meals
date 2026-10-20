@@ -1,7 +1,7 @@
 // Service worker: keeps the app working without internet, and receives
 // recipes shared from other apps (Android's Share menu → Family Menu).
 // Bump VERSION when the list of app files changes.
-const VERSION = "v5";
+const VERSION = "v6";
 const APP_CACHE = `family-menu-app-${VERSION}`;
 const IMAGE_CACHE = "family-menu-images";
 
@@ -48,6 +48,51 @@ const APP_FILES = [
   "./img/sun.png",
   "./img/hand-up.png",
   "./img/mascot.png",
+  "./img/canva/aisle-asian.png",
+  "./img/canva/aisle-dairy.png",
+  "./img/canva/aisle-meat.png",
+  "./img/canva/aisle-produce.png",
+  "./img/canva/arrow-go.png",
+  "./img/canva/calendar.png",
+  "./img/canva/cart.png",
+  "./img/canva/check-green.png",
+  "./img/canva/chef-kids.png",
+  "./img/canva/chili.png",
+  "./img/canva/clock.png",
+  "./img/canva/dice.png",
+  "./img/canva/flame.png",
+  "./img/canva/freezer.png",
+  "./img/canva/heart.png",
+  "./img/canva/home-white.png",
+  "./img/canva/kid-wave.png",
+  "./img/canva/leaf.png",
+  "./img/canva/lunchbox.png",
+  "./img/canva/mascot-cheer.png",
+  "./img/canva/mascot-peek.png",
+  "./img/canva/mascot-thumb.png",
+  "./img/canva/mascot-wave.png",
+  "./img/canva/meal-breakfast.png",
+  "./img/canva/meal-dinner.png",
+  "./img/canva/meal-lunch.png",
+  "./img/canva/medal.png",
+  "./img/canva/phone.png",
+  "./img/canva/plus-blue.png",
+  "./img/canva/refresh.png",
+  "./img/canva/salad.png",
+  "./img/canva/scale.png",
+  "./img/canva/share-white.png",
+  "./img/canva/smile.png",
+  "./img/canva/spoon.png",
+  "./img/canva/star-gold.png",
+  "./img/canva/star.png",
+  "./img/canva/sticker-bear.png",
+  "./img/canva/sticker-bunny.png",
+  "./img/canva/sticker-dolphin.png",
+  "./img/canva/sticker-frog.png",
+  "./img/canva/sticker-penguin.png",
+  "./img/canva/sticker-tiger.png",
+  "./img/canva/tomato-face.png",
+  "./img/canva/trophy.png",
 ];
 
 self.addEventListener("install", (event) => {

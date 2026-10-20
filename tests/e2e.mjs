@@ -334,12 +334,12 @@ await check("servings rescale the ingredients", async () => {
   await page.locator(".dish-title").waitFor();
   await page.locator(".servings .step-btn").nth(1).click();
   await page.locator(".servings .step-btn").nth(1).click();
-  assert.match(await page.locator(".ing").first().textContent(), /^2¼ lb ribeye/);
+  assert.match(await page.locator(".ing-btn").first().getAttribute("aria-label"), /^2¼ lb ribeye/);
   await page.locator(".servings .step-btn").nth(0).click();
   await page.locator(".servings .step-btn").nth(0).click();
   await page.locator(".servings .step-btn").nth(0).click();
   await page.locator(".servings .step-btn").nth(0).click();
-  assert.match(await page.locator(".ing").first().textContent(), /^¾ lb ribeye/);
+  assert.match(await page.locator(".ing-btn").first().getAttribute("aria-label"), /^¾ lb ribeye/);
 });
 
 await check("cook-along shows steps with timers and no stray text", async () => {
@@ -819,7 +819,7 @@ await check("one tap tries something else for a meal, and Undo puts it back", as
   await ideas.first().waitFor();
   assert.equal(await ideas.count(), 4);
   const first = await ideas.first().getAttribute("aria-label");
-  await sheet().getByText("🎲 More ideas").click();
+  await sheet().getByRole("button", { name: "More ideas" }).click();
   await page.waitForTimeout(100);
   assert.notEqual(await sheet().locator(".idea").first().getAttribute("aria-label"), first, "new ideas");
   await sheet().locator(".idea").first().click();
@@ -845,7 +845,7 @@ await check("a meal moves to another day (swapping with what's there), and Undo 
 await check("make extra tonight: tomorrow's lunch is leftovers, and the list doesn't buy it twice", async () => {
   await page.evaluate(async (k) => (await import("./js/store.js")).setSlotDishes(k, "lunch", []), nextWeek.tue);
   await openSpot(nextWeek.mon, "dinner");
-  await sheet().getByText("🍱 Make extra for lunch tomorrow").click();
+  await sheet().getByRole("button", { name: "Make extra for lunch tomorrow" }).click();
   await page.locator(".toast", { hasText: "Cooking double" }).waitFor();
   await closeSheets();
   const dinner = await slotOf(nextWeek.mon, "dinner");
@@ -893,17 +893,20 @@ await check("Today has a Change button on each planned meal", async () => {
 
 await check("Healthy, Mild/Spicy and grams switches change the recipe, steps and list", async () => {
   await page.goto(BASE + "#/dish/seed-kimchi-fried-rice");
-  await page.locator(".ing", { hasText: "4 cups cooked rice" }).waitFor();
-  await page.locator(".way", { hasText: "🥗 Healthy" }).click();
-  await page.locator(".ing", { hasText: "4 cups cooked brown rice" }).waitFor();
-  await page.locator(".ing", { hasText: "low-sodium soy sauce" }).waitFor();
+  // Name on the left, amount on the right, like the Canva recipe card.
+  const line = (text) => page.locator(`.ing-btn[aria-label*="${text}"]`);
+  await line("4 cups cooked rice").waitFor();
+  assert.equal(await line("4 cups cooked rice").locator(".ing-amount").textContent(), "4 cups");
+  await page.getByRole("switch", { name: /Healthy/ }).click();
+  await line("4 cups cooked brown rice").waitFor();
+  await line("low-sodium soy sauce").waitFor();
   await page.locator(".way-note", { hasText: "brown rice" }).waitFor();
-  await page.locator(".way", { hasText: "Mild" }).click();
-  await page.locator(".ing", { hasText: "(half for mild)" }).waitFor();
-  await page.locator(".way", { hasText: "Spicy" }).click();
-  await page.locator(".ing", { hasText: "extra for spice lovers" }).waitFor();
-  await page.locator(".way", { hasText: "🥄 Cups" }).click();
-  await page.locator(".ing", { hasText: "640 g cooked brown rice" }).waitFor();
+  await page.locator(".seg", { hasText: "Mild" }).click();
+  await line("(half for mild)").waitFor();
+  await page.locator(".seg", { hasText: "Spicy" }).click();
+  await line("extra for spice lovers").waitFor();
+  await page.locator(".seg", { hasText: "Grams" }).click();
+  await line("640 g cooked brown rice").waitFor();
   await page.goto(BASE + "#/dish/seed-gochujang-salmon");
   await page.locator(".steps li", { hasText: "220°C" }).waitFor();
   // Switches are saved for the family and the shopping list follows them.
@@ -960,7 +963,7 @@ await check("done shopping: ticked things go into what we have, and are set asid
   const pear = page.locator(".aisle .shop-item", { hasText: "Asian pear" });
   await pear.waitFor();
   await pear.locator(".shop-btn").click();
-  await page.getByText("🏠 Done shopping").click();
+  await page.getByRole("button", { name: "Done shopping" }).click();
   await page.locator(".toast", { hasText: "added to \"what we have\"" }).waitFor();
   const have = await page.evaluate(async () => (await import("./js/store.js")).state.settings.have);
   assert.ok(have.some((x) => /pear/.test(x)), have.join(", "));
@@ -969,6 +972,7 @@ await check("done shopping: ticked things go into what we have, and are set asid
   assert.equal(await page.locator(".aisle-produce .shop-item", { hasText: "Asian pear" }).count(), 0);
   await page.locator(".have-these .shop-item", { hasText: "Asian pear" }).getByText("We need it").click();
   await page.locator(".aisle-produce .shop-item", { hasText: "Asian pear" }).waitFor();
+  assert.doesNotMatch(await page.locator("#view").innerText(), /\bnull\b|undefined/, "no stray null text on the list");
 });
 
 await check("the shopping list is shared live with a second phone", async () => {
@@ -1016,9 +1020,13 @@ await check("the shopping list is shared live with a second phone", async () => 
   await page.getByLabel("Add something to the list").press("Enter");
   await phone.locator(".shop-item", { hasText: "Paper towels" }).waitFor({ timeout: 10000 });
   // Done shopping on the second phone puts what was bought in the first phone's "what we have".
-  await phone.getByText("🏠 Done shopping").click();
+  await phone.getByRole("button", { name: "Done shopping" }).click();
   await page.waitForFunction(async () => (await import("./js/store.js")).state.settings.have?.some((x) => /tortilla/.test(x)), null, { timeout: 10000 });
   await page.locator(".have-these", { hasText: "Flour tortillas" }).waitFor({ timeout: 10000 });
+  assert.doesNotMatch(await phone.locator("#view").innerText(), /\bnull\b|undefined/);
+  await phone.goto(link.replace(/^.*#.*$/, BASE + "#/settings"));
+  await phone.getByText("This phone uses the family's shared shopping list").waitFor();
+  assert.doesNotMatch(await phone.locator("#view").innerText(), /\bnull\b|undefined/, "no stray null text in Settings");
   await ctx2.close();
 
   await page.goto(BASE + "#/settings");

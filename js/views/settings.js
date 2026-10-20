@@ -43,7 +43,7 @@ function shareCard() {
     const cfg = shareConfig();
     if (cfg) {
       const link = joinLink(cfg);
-      box.append(
+      box.append(...[
         h("p", cfg.role === "member"
           ? "✅ This phone uses the family's shared shopping list."
           : "✅ The shopping list is shared. Open this link on the other phone to join:"),
@@ -72,7 +72,7 @@ function shareCard() {
           }, "Stop sharing"),
         ),
         h("p.muted.small", "Anyone with the link can see and tick the list, so only send it to family."),
-      );
+      ].filter(Boolean));
       return;
     }
     let apiKey = "";

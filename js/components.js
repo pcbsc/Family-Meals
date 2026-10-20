@@ -39,6 +39,21 @@ export function dishArt(dish, { kind = "thumb", className = "" } = {}) {
   return box;
 }
 
+/** A picture from the Canva design (img/canva/<name>.png). They're decoration, so no alt text. */
+export function icon(name, className = "") {
+  return h(`img.icon${className ? "." + className : ""}`, { src: `img/canva/${name}.png`, alt: "", "aria-hidden": "true", decoding: "async" });
+}
+
+const MEAL_ICONS = { breakfast: "meal-breakfast", lunch: "meal-lunch", dinner: "meal-dinner" };
+
+/** The round meal picture: a sunrise for breakfast, a sun for lunch, a dish cover for dinner. */
+export function mealIcon(meal) {
+  const key = typeof meal === "string" ? meal : meal.key;
+  if (MEAL_ICONS[key]) return icon(MEAL_ICONS[key], "meal-icon");
+  const m = MEALS.find((x) => x.key === key);
+  return h("span.meal-icon.emoji", { "aria-hidden": "true" }, m?.emoji || "🍽️");
+}
+
 export function dishTile(dish, { onclick, selected = false, small = false } = {}) {
   const avg = rating(dish);
   const face = faceFor(avg);
@@ -108,9 +123,9 @@ export function rateSheet(dish, { onDone } = {}) {
                   const brave = await rateDish(dish.id, m.id, f.score);
                   if (brave) {
                     const mine = stickersFor(m.id);
-                    const sticker = mine.find((x) => x.dish.id === dish.id)?.sticker || "⭐";
-                    confetti([sticker, "🏅", "⭐"]);
-                    toast(`Brave Bite! ${m.name} got a ${sticker} sticker for trying ${dish.name}.`, {
+                    const sticker = mine.find((x) => x.dish.id === dish.id)?.sticker || { emoji: "⭐", name: "star" };
+                    confetti([sticker.emoji, "🏅", "⭐"]);
+                    toast(`Brave Bite! ${m.name} got a ${sticker.emoji} ${sticker.name} sticker for trying ${dish.name}.`, {
                       emoji: "🏅", ms: 4000, action: { label: "See stickers", onclick: () => { close(); go("#/stickers"); } },
                     });
                   } else if (f.score === 4) confetti(["😍", "❤️", "⭐", "🎉"]);

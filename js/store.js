@@ -196,7 +196,12 @@ export async function rateDish(dishId, memberId, score) {
 
 // ---------- Brave Bites ----------
 
-const STICKERS = ["🦁", "🐯", "🦖", "🦄", "🐼", "🐸", "🦊", "🐙", "🦋", "🐳", "🚀", "⭐", "🌈", "🏆", "🐲", "🦒", "🐧", "🦜", "🍄", "🌻"];
+// The animal stickers from the Canva design (img/canva/sticker-<key>.png).
+export const STICKERS = [
+  { key: "tiger", name: "tiger", emoji: "🐯" }, { key: "dolphin", name: "dolphin", emoji: "🐬" },
+  { key: "bunny", name: "bunny", emoji: "🐰" }, { key: "bear", name: "bear", emoji: "🐻" },
+  { key: "penguin", name: "penguin", emoji: "🐧" }, { key: "frog", name: "frog", emoji: "🐸" },
+];
 export const STICKERS_PER_PRIZE = 10;
 
 /** A kid's stickers: one for every dish they've tried and rated, oldest first. */

@@ -8,7 +8,7 @@ import {
   removeWish, wishLabel, planHistory, go, refresh, snapshotSlots, restoreSlots, moveSlot, planLeftovers,
   freezer, planFromFreezer, cookPrefs,
 } from "../store.js";
-import { grownUp, dishArt, pickDishes, stepper, chip, progressSheet, needKeySheet } from "../components.js";
+import { grownUp, dishArt, pickDishes, stepper, chip, progressSheet, needKeySheet, icon } from "../components.js";
 
 function currentStart(params) {
   const w = params.get("w");
@@ -48,21 +48,23 @@ export function slotSheet(dayKey, meal) {
       for (const item of items) {
         body.append(h("div.slot-item",
           h("button.slot-dish", { onclick: async () => { await close(); go(`#/dish/${item.dish.id}`); } },
-            dishArt(item.dish, { className: "art-sm" }),
+            dishArt(item.dish, { className: "art-slot" }),
+          ),
+          h("div.slot-info",
             h("span.slot-dish-name", item.dish.name, itemBadge(item),
               item.leftover ? h("span.muted.block.small", "Leftovers from yesterday") : null,
               item.fromFreezer ? h("span.muted.block.small", "From the freezer") : null,
               item.extraFor ? h("span.muted.block.small", "Making extra for tomorrow's lunch") : null),
-          ),
-          h("div.slot-servings",
-            h("span.muted.small", "people"),
-            stepper(item.servings || state.settings.servings, {
-              label: "Servings",
-              onchange: async (n) => {
-                const fresh = getSlot(dayKey, meal);
-                await saveSlot({ ...fresh, items: fresh.items.map((i) => (i.dishId === item.dishId ? { ...i, servings: n } : i)) });
-              },
-            }),
+            h("div.slot-servings",
+              stepper(item.servings || state.settings.servings, {
+                label: "Servings",
+                onchange: async (n) => {
+                  const fresh = getSlot(dayKey, meal);
+                  await saveSlot({ ...fresh, items: fresh.items.map((i) => (i.dishId === item.dishId ? { ...i, servings: n } : i)) });
+                },
+              }),
+              h("span.slot-people", "people"),
+            ),
           ),
           h("button.icon-btn", {
             "aria-label": `Remove ${item.dish.name}`,
@@ -103,8 +105,8 @@ export function slotSheet(dayKey, meal) {
       if (ideas.length) {
         body.append(h("section.stack.swap-ideas",
           h("div.section-head",
-            h("h3", items.length ? "🔄 Try something else" : "💡 Ideas"),
-            h("button.btn.ghost.small", { onclick: () => { ideas = suggest(); draw(); } }, "🎲 More ideas"),
+            h("h3", items.length ? "Try something else" : "Ideas"),
+            h("button.more-ideas", { onclick: () => { ideas = suggest(); draw(); } }, icon("dice"), "More ideas"),
           ),
           h("div.idea-row", ideas.map((d) => h("button.idea", {
             "aria-label": `${items.length ? "Swap for" : "Pick"} ${d.name}`,
@@ -124,8 +126,8 @@ export function slotSheet(dayKey, meal) {
         const others = weekDays(start).map(dateKey).filter((k) => k !== dayKey && k >= dateKey(new Date()));
         if (others.length) {
           body.append(h("section.stack",
-            h("h3", "📆 Move to another day"),
-            h("div.row.wrap", others.map((k) => h("button.chip", {
+            h("h3", "Move to another day"),
+            h("div.day-chips", others.map((k) => h("button.chip.day-chip", {
               onclick: async () => {
                 const snap = snapshotSlots([[dayKey, meal], [k, meal]]);
                 await moveSlot(dayKey, k, meal);
@@ -141,7 +143,7 @@ export function slotSheet(dayKey, meal) {
       const extras = [];
       // Dinner tonight, leftovers tomorrow: cook double and lunch is done.
       if (meal === "dinner" && items.length && !items[0].extraFor) {
-        extras.push(h("button.btn.soft", {
+        extras.push(h("button.leftover-row", {
           onclick: async () => {
             const tomorrow = addDays(fromKey(dayKey), 1);
             const snap = snapshotSlots([[dayKey, "dinner"], [tomorrow, "lunch"]]);
@@ -149,15 +151,15 @@ export function slotSheet(dayKey, meal) {
             changed(`Cooking double: tomorrow's lunch is ${items[0].dish.name} leftovers.`, snap, "🍱");
             draw();
           },
-        }, "🍱 Make extra for lunch tomorrow"));
+        }, icon("lunchbox"), h("span.grow", "Make extra for lunch tomorrow"), h("span.row-go", { "aria-hidden": "true" }, "›")));
       }
       const frozen = freezer();
       if (frozen.length) {
         extras.push(h("section.stack",
-          h("h3", "🧊 From the freezer"),
+          h("h3.with-icon", icon("freezer"), "From the freezer"),
           h("div.row.wrap", frozen.map((f) => {
             const d = state.dishes.get(f.dishId);
-            return h("button.chip", {
+            return h("button.chip.freezer-chip", {
               onclick: async () => {
                 const snap = snapshotSlots([[dayKey, meal]]);
                 await planFromFreezer(dayKey, meal, d.id);
@@ -220,7 +222,7 @@ export function slotSheet(dayKey, meal) {
     };
     draw();
     return body;
-  }, { title: `${m.emoji} ${m.label} · ${prettyDate(fromKey(dayKey), { weekday: "long", month: "short", day: "numeric" })}`, onClose: refresh });
+  }, { title: `${m.label} · ${prettyDate(fromKey(dayKey), { weekday: "long" })}`, onClose: refresh });
 }
 
 function slotRow(day, meal) {
