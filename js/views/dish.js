@@ -11,6 +11,7 @@ import {
 } from "../recipe.js";
 import { dateKey } from "../planner.js";
 import { videoInfo } from "../video.js";
+import { leftoversFor, rangeText } from "../storage.js";
 import {
   state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh, addRecipeToShopping, cookPrefs, ourLines, saveSettings,
   addToFreezer, haveNames, removeHave,
@@ -18,6 +19,17 @@ import {
 import {
   grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet, icon, foodWarningBox,
 } from "../components.js";
+
+/** How long this dish keeps as leftovers, from the storage guide. */
+export function leftoverNote(dish, { short = false } = {}) {
+  const food = leftoversFor(dish);
+  if (!food || (!food.fridge && !food.freezer)) return null;
+  const parts = [food.fridge ? `${rangeText(food.fridge)} in the fridge` : "", food.freezer ? `${rangeText(food.freezer)} in the freezer` : ""].filter(Boolean);
+  return h(`${short ? "p" : "section.card"}.leftover-note`,
+    h("span", `🍱 Leftovers keep ${parts.join(", or ")}. `, food.key === "kimbap" ? "" : "Put them away within 2 hours. "),
+    h("a", { href: `#/keep?f=${food.key}` }, "How to keep them"),
+  );
+}
 
 /** "Last time we…": the note from the "We ate it" sheet. */
 function lastNote(dish) {
@@ -381,6 +393,7 @@ export function viewDish({ match }) {
       stepList,
     ),
     tipBox,
+    leftoverNote(dish),
     h("div.row.wrap.center.no-print",
       dish.videoUrl ? null : h("button.btn.ghost", { onclick: () => videoSheet(dish) }, "📺 Add a video"),
       h("button.btn.ghost", { onclick: () => window.print() }, "🖨️ Print recipe card"),

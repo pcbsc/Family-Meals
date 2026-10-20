@@ -4,9 +4,11 @@
 import { h, clearChildren, toast, prettyDate } from "../ui.js";
 import { whatCanIMake, keyIngredients, normalizeItemName } from "../recipe.js";
 import {
-  state, dishList, go, addShoppingExtras, freezer, addToFreezer, takeFromFreezer, haveItems, addHave, removeHave, FRESH_DAYS,
+  state, dishList, go, addShoppingExtras, freezer, addToFreezer, takeFromFreezer, haveItems, addHave, removeHave,
 } from "../store.js";
 import { backHeader, dishTile, dishArt, planItSheet, pickDishes } from "../components.js";
+import { leftoversFor, rangeText, toDays } from "../storage.js";
+import { foodSheet } from "./keep.js";
 
 const COMMON = [
   ["🥚", "eggs"], ["🍚", "rice"], ["🍗", "chicken"], ["🥩", "ground beef"], ["🐷", "pork"], ["🐟", "salmon"],
@@ -18,7 +20,7 @@ const COMMON = [
 const emojiFor = (item) => COMMON.find(([, name]) => normalizeItemName(name) === normalizeItemName(item))?.[0] || "🧺";
 
 /** "Tue" this week, "Oct 12" before. */
-const dayText = (at) => prettyDate(new Date(at), Date.now() - at < 6 * 24 * 3600 * 1000 ? { weekday: "short" } : { month: "short", day: "numeric" });
+const dayText = (at) => prettyDate(new Date(at), Math.abs(Date.now() - at) < 6 * 24 * 3600 * 1000 ? { weekday: "short" } : { month: "short", day: "numeric" });
 
 export function viewFridge() {
   const haveBox = h("div.stack.have-list");
@@ -56,18 +58,24 @@ export function viewFridge() {
     const stale = items.filter((x) => x.stale);
     const have = fresh.map((x) => x.name);
     startOver.hidden = !items.length;
+    // Tap a food to learn how long it lasts and how to keep it; ✕ when it's gone.
     if (fresh.length) {
-      haveBox.append(h("div.row.wrap", fresh.map((item) => h("button.have-chip", {
-        "aria-label": `Remove ${item.name}`,
-        onclick: () => drop(item),
-      }, emojiFor(item.name), " ", item.name, item.at ? h("span.have-when", dayText(item.at)) : null, h("span.have-x", "✕")))));
+      haveBox.append(h("div.row.wrap", fresh.map((item) => h(`span.have-chip-wrap${item.soon ? ".soon" : ""}`,
+        h("button.have-chip", {
+          "aria-label": `How to keep ${item.name}`,
+          onclick: () => (item.food ? foodSheet(item.food, { onRemove: () => drop(item), title: item.name }) : toast("Tap ✕ when it's gone.", { emoji: "🧺" })),
+        }, emojiFor(item.name), " ", item.name,
+        item.soon ? h("span.have-soon", "use soon") : item.useBy ? h("span.have-when", `good till ${dayText(item.useBy)}`) : item.at ? h("span.have-when", dayText(item.at)) : null),
+        h("button.have-x", { "aria-label": `Remove ${item.name}`, onclick: () => drop(item) }, "✕"),
+      ))));
+      haveBox.append(h("p.muted.small", "Tap a food to see how long it lasts and how to keep it."));
     } else if (!stale.length) {
       haveBox.append(h("p.muted", "Nothing yet. Tap the foods below, or type them."));
     }
-    // Fresh food bought over a week ago: still here? Until someone says so, it goes back on the list.
+    // Past how long it usually keeps: still here? Until someone says so, it goes back on the list.
     if (stale.length) {
       haveBox.append(h("div.stale-have",
-        h("p.muted.small", `Still have these? We got them more than ${FRESH_DAYS} days ago. Tap the ones that are still here.`),
+        h("p.muted.small", "Still have these? They're past how long they usually keep. Tap the ones that are still good."),
         h("div.row.wrap", stale.map((item) => h("span.stale-chip",
           h("button.have-chip.stale", {
             "aria-label": `We still have ${item.name}`,
@@ -122,16 +130,21 @@ export function viewFridge() {
   const freezerBox = h("section.card.stack.freezer");
   const drawFreezer = () => {
     clearChildren(freezerBox);
-    const frozen = freezer();
+    const frozen = [...freezer()].sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
     freezerBox.append(
       h("h2", "🧊 In the freezer"),
       frozen.length
         ? h("div.almost-list", frozen.map((f) => {
           const dish = state.dishes.get(f.dishId);
-          return h("div.almost",
+          // Frozen food stays safe, but it's tastiest within the guide's time: oldest first, a nudge when it's due.
+          const keeps = leftoversFor(dish)?.freezer;
+          const due = f.addedAt && keeps ? f.addedAt + toDays(keeps) * 24 * 3600 * 1000 : null;
+          const when = f.addedAt ? `frozen ${dayText(f.addedAt)}` : "";
+          const note = due && Date.now() > due ? `eat soon: best within ${rangeText(keeps)}` : due ? `best by ${dayText(due)}` : "";
+          return h(`div.almost${due && Date.now() > due ? ".freezer-due" : ""}`,
             h("button.almost-dish", { onclick: () => planItSheet(dish) },
               dishArt(dish, { className: "art-sm" }),
-              h("span.grow", h("strong", dish.name), h("span.muted.block", `${f.meals} meal${f.meals === 1 ? "" : "s"} · tap to plan it`)),
+              h("span.grow", h("strong", dish.name), h("span.muted.block", [`${f.meals} meal${f.meals === 1 ? "" : "s"}`, when, note].filter(Boolean).join(" · "))),
             ),
             h("button.icon-btn", {
               "aria-label": `We ate one ${dish.name}`,
@@ -160,6 +173,7 @@ export function viewFridge() {
 
   return h("div.screen.fridge",
     backHeader("🧊 What can we make?", { back: "#/menu" }),
+    h("button.btn.ghost.wide.keep-link", { onclick: () => go("#/keep") }, "📚 How long does food last? How to keep it"),
     h("section.card.stack",
       h("h2", "What do we have?"),
       haveBox,

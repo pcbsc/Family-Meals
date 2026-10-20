@@ -109,7 +109,10 @@ export function viewMenu({ params }) {
       h("h1", "📖 Menu"),
       h("button.btn.primary", { onclick: () => go("#/add") }, "➕ Add"),
     ),
-    h("button.btn.soft.wide.fridge-btn", { onclick: () => go("#/fridge") }, "🧊 What can we make with what we have?"),
+    h("div.menu-tools",
+      h("button.btn.soft.fridge-btn", { onclick: () => go("#/fridge") }, "🧊 What can we make with what we have?"),
+      h("button.btn.soft.keep-btn", { onclick: () => go("#/keep") }, "📚 How long does food last?"),
+    ),
     filters,
     kindsBox,
     h("input.search", {

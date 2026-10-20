@@ -11,6 +11,7 @@ import {
 import { shareConfig, readList, writeList, startList, tickId, extraId } from "../share.js";
 import { MEALS } from "../seed.js";
 import { icon, dishArt } from "../components.js";
+import { putAwaySheet } from "./keep.js";
 
 // Aisle pictures from the Canva design; the other aisles keep their emoji.
 const AISLE_ICONS = { produce: "aisle-produce", meat: "aisle-meat", dairy: "aisle-dairy", asian: "aisle-asian" };
@@ -372,8 +373,10 @@ export function viewShop({ params, setCleanup }) {
             if (!tickedCount) return toast("Tick what you bought first, then tap Done shopping.", { emoji: "☝️" });
             const names = boughtNames(items, list.extras, list.ticked);
             await list.done(names);
-            toast(names.length ? `All put away! ${names.length} thing${names.length === 1 ? "" : "s"} added to "what we have".` : "All done!", { emoji: "🏠" });
+            toast(names.length ? `${names.length} thing${names.length === 1 ? "" : "s"} added to "what we have".` : "All done!", { emoji: "🏠" });
             draw();
+            // Where it all goes, and how long it keeps.
+            putAwaySheet(names.map((n) => items.find((i) => i.key === n)?.name || n));
           },
         }, icon("home-white"), "Done shopping"),
         h("button.btn.primary.shop-send", { onclick: () => sendList(items, list) }, icon("share-white"), "Send the list"),

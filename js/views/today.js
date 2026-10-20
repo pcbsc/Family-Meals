@@ -8,7 +8,8 @@ import {
 } from "../store.js";
 import { grownUp, dishArt, dishTile, wishFlow, pickDishes, icon, mealIcon, rateRows, braveBite } from "../components.js";
 import { slotSheet } from "./week.js";
-import { usedUp } from "./dish.js";
+import { usedUp, leftoverNote } from "./dish.js";
+import { factFor } from "../storage.js";
 
 /**
  * The "Change" pill on a planned meal: swap, move, leftovers… With a grown-up
@@ -184,6 +185,7 @@ function weAteIt({ key, slot, items, back }) {
       usedUp(main.dish),
       h("section.stack",
         h("h3", "Anything left?"),
+        leftoverNote(main.dish, { short: true }),
         h("div.row.wrap",
           h("button.btn.soft", {
             onclick: once(async (e) => {
@@ -246,6 +248,16 @@ function lastNight() {
         h("button.btn.ghost", { onclick: markDone }, "Skip"),
       ),
     ),
+  );
+}
+
+/** One food fact a day from the storage guide, with a tap to learn more. */
+function didYouKnow() {
+  const food = factFor();
+  if (!food) return null;
+  return h("button.card.did-you-know", { onclick: () => go(`#/keep?f=${food.key}`) },
+    h("span.dyk-emoji", { "aria-hidden": "true" }, food.emoji),
+    h("span.grow", h("strong", "💡 Did you know?"), h("span.block", food.why)),
   );
 }
 
@@ -314,6 +326,7 @@ export function viewToday() {
       h("span.wish-go", icon("arrow-go")),
     ),
     braveBites(),
+    didYouKnow(),
     grownUpBanners(),
   );
 }

@@ -4,6 +4,7 @@ import * as db from "./db.js";
 import { MEALS, STARTER_DISHES, LATEST_STARTER_BATCH, MILD_TIPS, startersToAdd, starterVideoFills } from "./seed.js";
 import { dateKey, fromKey, addDays, slotId, averageRating, weekStart } from "./planner.js";
 import { cookedLines, normalizeItemName, aisleFor, foodsIn } from "./recipe.js";
+import { foodFor, keepsDays } from "./storage.js";
 
 const FOOD_NOTES = "Our kids like some spice (our 7-year-old loves spicy food). Keep a mild way to make spicy dishes.";
 const CUISINE_MIX = "Mostly Korean home cooking, Korean-American and Korean fusion favorites (like bulgogi tacos and kimchi quesadillas), plus some American, Italian and Mexican family dinners. Kid-friendly, with healthy choices.";
@@ -637,17 +638,26 @@ const DAY = 24 * 3600 * 1000;
 export const FRESH_DAYS = 7;
 
 /**
- * What's in the kitchen: [{ name, key, at, stale }]. Veggies, meat, eggs and
- * milk are only a guess after a week, so they stop hiding things on the
- * shopping list until someone says we still have them.
+ * What's in the kitchen: [{ name, key, at, food, useBy, soon, stale }].
+ * Each food keeps as long as the storage guide says it does where it lives
+ * (berries a few days, carrots weeks, rice years); after that it's only a
+ * guess, so it stops hiding things on the shopping list until someone says we
+ * still have it. Fresh food the guide doesn't know is a guess after a week.
  */
 export function haveItems(now = Date.now()) {
   const at = state.settings.haveAt || {};
   return (state.settings.have || []).map((name) => {
     const key = normalizeItemName(name);
     const when = at[key] ?? null;
+    const food = foodFor(name);
     const fresh = ["produce", "meat", "dairy"].includes(aisleFor(`${key} ${name}`));
-    return { name, key, at: when, stale: fresh && when != null && now - when > FRESH_DAYS * DAY };
+    const days = keepsDays(name) ?? (fresh ? FRESH_DAYS : null);
+    const useBy = when != null && days ? when + days * DAY : null;
+    return {
+      name, key, at: when, food, useBy,
+      stale: useBy != null && now > useBy,
+      soon: useBy != null && now <= useBy && useBy - now < 1.5 * DAY,
+    };
   });
 }
 

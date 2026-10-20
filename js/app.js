@@ -13,6 +13,7 @@ import { viewShop } from "./views/shop.js";
 import { viewSettings, viewWelcome, viewJoin } from "./views/settings.js";
 import { viewFridge } from "./views/fridge.js";
 import { viewStickers } from "./views/stickers.js";
+import { viewKeep } from "./views/keep.js";
 
 // full: hides the tab bar. still: background refreshes don't redraw it (so
 // cook-along keeps its place when a rating sheet closes).
@@ -32,6 +33,7 @@ const ROUTES = [
   { re: /^\/welcome$/, view: viewWelcome, full: true, still: true },
   { re: /^\/join$/, view: viewJoin, full: true, still: true },
   { re: /^\/stickers$/, view: viewStickers, tab: "today" },
+  { re: /^\/keep$/, view: viewKeep, tab: "menu" },
 ];
 
 const scrollMemory = new Map();
