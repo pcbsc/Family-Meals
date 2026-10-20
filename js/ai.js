@@ -362,6 +362,10 @@ Plan meals the family will enjoy and that are good for growing kids:
 - Balance the week: vegetables every day, fish once or twice, a mix of beef, chicken, pork, tofu and eggs, not much fried or sugary food.
 - For a Korean-style dinner you may add one or two side dishes (banchan or a soup) from the menu after the main dish, like a real Korean table with rice.
 - Breakfasts are quick on weekdays (15 minutes or less) and can be special on weekends. Repeating a breakfast or snack is fine.
+- Each menu dish has minutes (prep plus cook) and its mainIngredients. Monday to Thursday dinners are school nights: about 40 minutes or less. A note like "busy Wednesday" means 30 minutes or less, or a freezer meal.
+- haveAtHome is food already in the kitchen: plan dishes that use it up first, especially fresh food.
+- freezer lists meals already cooked and frozen. One is perfect for a busy night: use its dishId alone in the slot and start "why" with "From the freezer:".
+- Each person may have allergies (never plan a dish with them, for anyone), dislikes (avoid them, or say in "why" how to serve that person's portion without it) and a spice level.
 - Mostly Korean, Korean-American and Korean fusion dishes, unless the notes say otherwise, with some other family favorites mixed in.
 - spiceLevel is how spicy the family likes it ("mild", "medium" or "spicy"). With "medium" or "spicy", spicy dishes are welcome (some kids love spice), but no more than one very spicy dinner in a row. With "mild", say in "why" how to make any spicy dish milder.
 - healthyCooking true means they want healthier meals: more vegetables, fish and tofu, brown or multigrain rice, little fried or sugary food.

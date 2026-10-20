@@ -237,3 +237,36 @@ test("rice covers rice, but not rice cakes or rice paper", () => {
   const result = whatCanIMake([tteokbokki, bowl], ["rice"]);
   assert.deepEqual(result.map((r) => r.dish.name), ["Bowl"]);
 });
+
+test("cooking together: grown-up steps are whole words, and kids get a job", async () => {
+  const { needsGrownUp, kidJob, ingredientsInStep } = await import("../../js/recipe.js");
+  for (const step of ["Heat the oil in a pan.", "Cut the tofu into cubes.", "Bake for 20 minutes.", "A grown-up drains the noodles."]) assert.ok(needsGrownUp(step), step);
+  for (const step of ["Roll each one in panko.", "Mix the pancake batter.", "Mash the potatoes with a fork.", "Thread half a hot dog onto each stick."]) assert.ok(!needsGrownUp(step), step);
+  assert.match(kidJob("Crack the eggs into a bowl and beat them."), /Crack the eggs/);
+  assert.match(kidJob("Top with green onions and sesame seeds."), /kid scissors/);
+  assert.match(kidJob("Fill each wrapper with a spoonful and pinch closed to make mandu."), /Fill the wrappers/);
+  assert.equal(kidJob("Simmer for 10 minutes.", { hasTimer: true }), "Be the timer captain: tap the timer and shout when it rings!");
+  // At the stove, the job is away from the heat.
+  assert.equal(kidJob("Simmer gently, then arrange on a plate."), "Be the helper: hand the grown-up each thing when it's time.");
+  assert.match(kidJob("Cook the noodles in boiling water. Drain and rinse with cold water.", { hasTimer: true }), /timer captain/);
+  assert.match(kidJob("Turn off the heat. Sprinkle with sesame seeds."), /Sprinkle/);
+  assert.equal(kidJob("Let it rest."), "");
+  const names = ["ribeye or sirloin", "onion", "green onions", "soy sauce", "cylinder rice cakes (tteok)", "red bell pepper", "water", "hard-boiled eggs"];
+  const used = (step) => ingredientsInStep(step, names).map((i) => names[i]);
+  assert.deepEqual(used("Add the beef and onion."), ["ribeye or sirloin", "onion"]);
+  assert.deepEqual(used("Add the green onions for the last minute."), ["green onions"]);
+  assert.deepEqual(used("Soak the rice cakes in warm water."), ["cylinder rice cakes (tteok)"]);
+  assert.deepEqual(used("Cook the bell pepper with the soy sauce, then add the eggs."), ["soy sauce", "red bell pepper", "hard-boiled eggs"]);
+});
+
+test("allergies and dislikes are found in ingredients, sauces too, without look-alikes", async () => {
+  const { foodsIn } = await import("../../js/recipe.js");
+  const dish = { ingredients: ["Sauce:", "3 tbsp soy sauce", "1 tbsp gochujang", "2 tbsp peanut butter", "1 can coconut milk", "8 corn tortillas", "4 oz glass noodles", "1 cup shiitake mushrooms"] };
+  const found = (foods) => foodsIn(dish, foods).map((x) => `${x.food}: ${x.lines.join(" | ")}`);
+  assert.deepEqual(found("wheat"), ["wheat: 3 tbsp soy sauce | 1 tbsp gochujang"]);
+  assert.deepEqual(found("soy"), ["soy: 3 tbsp soy sauce | 1 tbsp gochujang"]);
+  assert.deepEqual(found("peanuts, milk, eggs"), ["peanuts: 2 tbsp peanut butter"]);
+  assert.deepEqual(found("Mushrooms"), ["mushrooms: 1 cup shiitake mushrooms"]);
+  assert.deepEqual(foodsIn({ ingredients: ["2 tbsp butter", "1 tbsp fish sauce", "4 shrimp"] }, "dairy; fish; shellfish").map((x) => x.food), ["dairy", "fish", "shellfish"]);
+  assert.deepEqual(foodsIn(dish, ""), []);
+});

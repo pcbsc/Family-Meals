@@ -2,22 +2,29 @@
 // that rescale the ingredients, and Cook-along: one big step at a time with timers.
 import {
   h, toast, confetti, confirmSheet, preparePhoto, pickImage, ding, speak, keepScreenOn,
-  minutesText, clearChildren, openSheet, once, stopSpeaking,
+  minutesText, clearChildren, openSheet, once, stopSpeaking, prettyDate,
 } from "../ui.js";
 import { SPICE, CUISINES, cuisineOf } from "../seed.js";
 import {
-  scaleIngredient, parseIngredient, findTimers, cleanLink, cookedLines, toMetric, metricText, SPICE_LEVELS, keyIngredients,
-  isChiliLine, haveCovers, normalizeItemName,
+  scaleIngredient, parseIngredient, findTimers, cleanLink, toMetric, metricText, SPICE_LEVELS, keyIngredients,
+  isChiliLine, haveCovers, normalizeItemName, kidJob, needsGrownUp, ingredientsInStep,
 } from "../recipe.js";
 import { dateKey } from "../planner.js";
 import { videoInfo } from "../video.js";
 import {
-  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh, addRecipeToShopping, cookPrefs, saveSettings,
-  addToFreezer,
+  state, updateDish, addPhoto, removePhotoFromDish, photoUrl, go, refresh, addRecipeToShopping, cookPrefs, ourLines, saveSettings,
+  addToFreezer, haveNames, removeHave,
 } from "../store.js";
 import {
-  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet, icon,
+  grownUp, dishArt, backHeader, stepper, rateSheet, familyFaces, planItSheet, progressSheet, needKeySheet, icon, foodWarningBox,
 } from "../components.js";
+
+/** "Last time we…": the note from the "We ate it" sheet. */
+function lastNote(dish) {
+  const n = dish.lastNote;
+  if (!n?.text) return null;
+  return h("p.last-note", "📝 Last time (", prettyDate(new Date(`${n.date}T12:00`), { month: "short", day: "numeric" }), "): ", n.text);
+}
 
 function notFound() {
   return h("div.screen", backHeader("Oops", { back: "#/menu" }), h("div.empty-state", h("div.huge-emoji", "🤷"), h("p", "That dish isn't in our menu anymore.")));
@@ -205,25 +212,38 @@ function splitAmount(text) {
 
 /** The ingredient lines to show: our way (healthier, spice level), scaled, in our units. */
 function shownLines(dish, factor) {
-  const prefs = cookPrefs();
-  const cooked = cookedLines(dish, prefs);
+  const prefs = cookPrefs(dish);
+  const cooked = ourLines(dish);
   const fix = (line) => {
     const scaled = scaleIngredient(line, factor);
     return prefs.metric ? toMetric(scaled) : scaled;
   };
+  const step = (text) => (prefs.metric ? metricText(text) : text);
   return {
     ...cooked,
     prefs,
-    lines: cooked.lines.map((l) => ({ ...l, header: parseIngredient(l.line).header, text: fix(l.line) })),
-    step: (text) => (prefs.metric ? metricText(text) : text),
+    lines: cooked.lines.map((l) => {
+      const p = parseIngredient(l.line);
+      return { ...l, header: p.header, item: p.item, text: fix(l.line) };
+    }),
+    step,
+    stepNotes: cooked.stepNotes.map(step),
   };
 }
 
-/** Healthy, how spicy, cups or grams: one tap each, saved for the family. */
+/**
+ * Healthy and how spicy, for this recipe only (a kid trying Spicy here doesn't
+ * change every recipe), and cups or grams for every recipe.
+ */
 function cookWay(dish, onchange) {
-  const prefs = cookPrefs();
-  const set = async (patch) => {
-    await saveSettings(patch);
+  const prefs = cookPrefs(dish);
+  const setWay = async (patch) => {
+    const fresh = state.dishes.get(dish.id) || dish;
+    await updateDish(dish.id, { way: { ...(fresh.way || {}), ...patch } });
+    onchange();
+  };
+  const setUnits = async (metric) => {
+    await saveSettings({ metric });
     onchange();
   };
   const hot = dish.spicy > 0 || dish.ingredients.some(isChiliLine);
@@ -232,25 +252,32 @@ function cookWay(dish, onchange) {
     h("button.way-switch", {
       role: "switch",
       "aria-checked": String(prefs.healthy),
-      onclick: () => set({ healthy: !prefs.healthy }),
+      onclick: () => setWay({ healthy: !prefs.healthy }),
     }, icon("salad"), h("span.grow", "Healthy"), h(`span.switch${prefs.healthy ? ".on" : ""}`, { "aria-hidden": "true" })),
     hot || prefs.spice === "spicy"
       ? h("div.segmented.spice", { role: "group", "aria-label": "How spicy" }, SPICE_LEVELS.map((lvl) =>
         h(`button.seg${prefs.spice === lvl.key ? ".on" : ""}`, {
           "aria-pressed": String(prefs.spice === lvl.key),
-          onclick: () => set({ spice: lvl.key }),
+          onclick: () => setWay({ spice: lvl.key }),
         }, icon(SPICE_ICONS[lvl.key]), lvl.label)))
       : null,
     h("div.segmented.units", { role: "group", "aria-label": "Amounts" },
-      h(`button.seg${prefs.metric ? "" : ".on"}`, { "aria-pressed": String(!prefs.metric), onclick: () => set({ metric: false }) }, icon("spoon"), "Cups"),
-      h(`button.seg${prefs.metric ? ".on" : ""}`, { "aria-pressed": String(prefs.metric), onclick: () => set({ metric: true }) }, icon("scale"), "Grams"),
+      h(`button.seg${prefs.metric ? "" : ".on"}`, { "aria-pressed": String(!prefs.metric), onclick: () => setUnits(false) }, icon("spoon"), "Cups"),
+      h(`button.seg${prefs.metric ? ".on" : ""}`, { "aria-pressed": String(prefs.metric), onclick: () => setUnits(true) }, icon("scale"), "Grams"),
     ),
+    prefs.own
+      ? h("p.way-own", "Just for this recipe. ",
+        h("button.link-btn", { onclick: async () => { await updateDish(dish.id, { way: null }); onchange(); } }, "Use our usual way"))
+      : null,
   );
 }
 
 export function viewDish({ match }) {
-  const dish = state.dishes.get(match[1]);
-  if (!dish) return notFound();
+  const found = state.dishes.get(match[1]);
+  if (!found) return notFound();
+  // The switches save onto the dish, so always read the newest copy.
+  const current = () => state.dishes.get(found.id) || found;
+  const dish = found;
   let servings = servingsMemory.get(dish.id) || dish.servings || state.settings.servings || 4;
   const checked = new Set();
   const list = h("ul.ingredients");
@@ -262,8 +289,8 @@ export function viewDish({ match }) {
     clearChildren(way);
     clearChildren(stepList);
     clearChildren(tipBox);
-    const shown = shownLines(dish, servings / (dish.servings || servings));
-    way.append(cookWay(dish, drawIngredients));
+    const shown = shownLines(current(), servings / (dish.servings || servings));
+    way.append(cookWay(current(), drawIngredients));
     if (shown.swaps.length) way.append(h("p.way-note", icon("leaf"), h("span", "Healthier: ", shown.swaps.join(", "))));
     shown.lines.forEach((l, i) => {
       if (l.header) return list.append(h("li.ing-header", parseIngredient(l.line).item));
@@ -279,7 +306,7 @@ export function viewDish({ match }) {
       ));
     });
     stepList.append(dish.steps.length
-      ? h("ol.steps", dish.steps.map((s) => h("li", shown.step(s))))
+      ? h("ol.steps", dish.steps.map((s, i) => h("li", h("span.step-body", shown.step(s), shown.stepNotes[i] ? h("span.step-note", shown.stepNotes[i]) : null))))
       : h("p.muted", "No steps yet."));
     const tips = [...shown.tips.map(shown.step), dish.notes ? shown.step(dish.notes) : ""].filter(Boolean);
     if (tips.length) tipBox.append(h("section.card.notes", h("h2", "💡 Tips"), tips.map((t) => h("p", t))));
@@ -299,9 +326,16 @@ export function viewDish({ match }) {
     photoStrip(dish),
     h("div.dish-title",
       h("h1", dish.name),
-      dish.nameKo ? h("p.ko", dish.nameKo) : null,
+      dish.nameKo
+        ? h("p.ko", dish.nameKo, " ", h("button.say-ko", {
+          "aria-label": `Say ${dish.nameKo} in Korean`,
+          onclick: () => speak(dish.nameKo, { lang: "ko-KR" }) || toast("This device can't read aloud.", { emoji: "🔇" }),
+        }, "🔊"))
+        : null,
       dish.description ? h("p.desc", dish.description) : null,
     ),
+    lastNote(dish),
+    foodWarningBox(dish),
     h("div.facts",
       cuisine ? h("span.fact", h("span.fact-emoji", cuisine.emoji), cuisine.label) : null,
       total ? h("span.fact", icon("clock"), minutesText(total)) : null,
@@ -359,16 +393,16 @@ export function viewDish({ match }) {
 // ---------- Cook-along ----------
 
 /** After cooking: tap what got used up, and it comes off "what we have". */
-function usedUp(dish) {
+export function usedUp(dish) {
   const need = keyIngredients(dish);
-  const have = (state.settings.have || []).filter((x) => [...need].some((k) => haveCovers(normalizeItemName(x), k)));
+  const have = haveNames().filter((x) => [...need].some((k) => haveCovers(normalizeItemName(x), k)));
   if (!have.length) return null;
   const box = h("section.card.stack.used-up",
     h("h3", "Did we use anything up?"),
     h("p.muted.small", "Tap it and it comes off our \"what we have\" list."),
     h("div.row.wrap", have.map((item) => h("button.chip", {
       onclick: async (e) => {
-        await saveSettings({ have: (state.settings.have || []).filter((x) => x !== item) });
+        await removeHave((name) => name === item);
         e.currentTarget.remove();
         toast(`Okay, no more ${item}.`, { emoji: "🧺" });
       },
@@ -377,41 +411,65 @@ function usedUp(dish) {
   return box;
 }
 
-const GROWN_UP = /\b(knife|cut|slice|chop|dice|mince|grate|boil|fry|fried|oven|sear|blanch|hot|drain|blend|simmer|stove|pan|bake|roast|grill|broil|steam|skillet|pot)/i;
+// ---------- Timers: several at once, each named for its step ----------
 
-let activeTimer = null;
+const timers = [];
+const dock = h("div.timer-dock", { role: "region", "aria-label": "Timers" });
 
-function timerPill() {
-  const pill = h("div.timer-pill", { role: "timer" });
-  const tick = () => {
-    if (!activeTimer) return pill.remove();
-    const left = Math.max(0, Math.round((activeTimer.end - Date.now()) / 1000));
-    clearChildren(pill);
-    pill.append(
-      h("span.timer-time", `⏰ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`),
-      h("button.timer-btn", { onclick: () => { activeTimer.end += 60000; tick(); } }, "+1 min"),
-      h("button.timer-btn", { "aria-label": "Stop timer", onclick: () => { clearInterval(activeTimer.id); activeTimer = null; tick(); } }, "✕"),
-    );
-    if (left === 0) {
-      clearInterval(activeTimer.id);
-      activeTimer = null;
-      ding();
-      document.body.classList.add("flash");
-      setTimeout(() => document.body.classList.remove("flash"), 1600);
-      toast("Time's up!", { emoji: "⏰", ms: 6000 });
-      pill.remove();
+// Each pill is built once and only its time changes, so a tap never lands on a pill being replaced.
+function drawTimers() {
+  for (const t of timers) {
+    if (!t.el) {
+      t.time = h("span.timer-time");
+      t.el = h("div.timer-pill", { role: "timer" },
+        h("span.timer-name", t.name),
+        t.time,
+        h("button.timer-btn", { "aria-label": `Add a minute to ${t.name}`, onclick: () => { t.end += 60000; drawTimers(); } }, "+1"),
+        h("button.timer-btn", { "aria-label": `Stop ${t.name}`, onclick: () => stopTimer(t) }, "✕"),
+      );
+      dock.append(t.el);
     }
-  };
-  return { pill, tick };
+    const left = Math.max(0, Math.round((t.end - Date.now()) / 1000));
+    t.time.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  }
+  // In cook-along the timers sit just above its buttons; anywhere else, small at the bottom.
+  const home = document.querySelector(".cook-timers") || document.body;
+  if (timers.length && dock.parentNode !== home) home.append(dock);
+  if (!timers.length) dock.remove();
+  document.body.classList.toggle("has-timers", timers.length > 0 && home === document.body);
 }
 
-function startTimer(seconds) {
-  if (activeTimer) clearInterval(activeTimer.id);
-  document.querySelector(".timer-pill")?.remove();
-  const { pill, tick } = timerPill();
-  activeTimer = { end: Date.now() + seconds * 1000, id: setInterval(() => tick(), 1000) };
-  document.body.append(pill);
-  tick();
+function stopTimer(t) {
+  const i = timers.indexOf(t);
+  if (i >= 0) timers.splice(i, 1);
+  t.el?.remove();
+  if (!timers.length) clearInterval(tickId);
+  drawTimers();
+}
+
+let tickId = null;
+function tickTimers() {
+  for (const t of [...timers]) {
+    if (t.end > Date.now()) continue;
+    stopTimer(t);
+    ding();
+    document.body.classList.add("flash");
+    setTimeout(() => document.body.classList.remove("flash"), 1600);
+    toast(`Time's up: ${t.name}!`, { emoji: "⏰", ms: 8000 });
+  }
+  drawTimers();
+}
+
+/** Starts a timer; the rice keeps going while the next step's timer runs. */
+export function startTimer(seconds, name) {
+  // The same timer again restarts it rather than adding a twin.
+  const same = timers.find((t) => t.name === name);
+  if (same) same.end = Date.now() + seconds * 1000;
+  else timers.push({ name, end: Date.now() + seconds * 1000 });
+  if (timers.length > 4) timers.shift().el?.remove();
+  clearInterval(tickId);
+  tickId = setInterval(tickTimers, 1000);
+  drawTimers();
 }
 
 export function viewCook({ match, params, setCleanup }) {
@@ -450,9 +508,10 @@ export function viewCook({ match, params, setCleanup }) {
     : h("span.spacer-36");
 
   const readAloud = () => {
+    const job = index > 0 && index < last ? kidJob(steps[index - 1], { hasTimer: findTimers(steps[index - 1]).length > 0 }) : "";
     const text = index === 0
       ? "Let's get ready! Gather these: " + shown.lines.filter((l) => !l.header && !l.off).map((l) => l.text).join(", ")
-      : index === last ? "You did it! Great job!" : `Step ${index}. ${steps[index - 1]}`;
+      : index === last ? "You did it! Great job!" : `Step ${index}. ${steps[index - 1]}${job ? ` Kids, your job: ${job}` : ""}`;
     if (!speak(text)) toast("This device can't read aloud.", { emoji: "🔇" });
   };
 
@@ -469,6 +528,8 @@ export function viewCook({ match, params, setCleanup }) {
       stage.append(
         h("h2.cook-title", "🧺 Get ready!"),
         h("p.cook-sub", `Gather everything for ${servings} people. Tap each one when you have it.`),
+        foodWarningBox(dish),
+        lastNote(dish),
         h("ul.gather", lines.map(({ line, n }) => {
           const li = h(`li${gathered.has(n) ? ".done" : ""}`,
             h("button.ing-btn", {
@@ -511,14 +572,22 @@ export function viewCook({ match, params, setCleanup }) {
       );
     } else {
       const text = steps[index - 1];
-      const timers = findTimers(text);
+      const found = findTimers(text);
+      // The amounts this step uses, so nobody scrolls back to the list.
+      const uses = ingredientsInStep(text, shown.lines.map((l) => (l.header || l.off ? "" : l.item)))
+        .map((n) => shown.lines[n]).filter((l) => parseIngredient(l.text).qty != null).slice(0, 6);
+      const job = kidJob(text, { hasTimer: found.length > 0 });
+      const grown = needsGrownUp(text);
       stage.append(...[
         h("div.step-num", index),
         h("p.step-text", text),
-        GROWN_UP.test(text) ? h("p.grown-up", "🧑 A grown-up helps with this step") : null,
-        timers.length
-          ? h("div.row.wrap.center", timers.map((t) =>
-            h("button.btn.timer-start", { onclick: () => startTimer(t.seconds) }, `⏰ Start ${t.label} timer`)))
+        uses.length ? h("div.step-amounts", { "aria-label": "Amounts for this step" }, uses.map((l) => h("span.step-amount", l.text))) : null,
+        shown.stepNotes[index - 1] ? h("p.step-note", shown.stepNotes[index - 1]) : null,
+        job ? h("p.kid-job", h("span.kid-job-who", "🧒 Your job"), h("span", job)) : null,
+        grown ? h("p.grown-up", "🧑 Grown-up: knife, stove or oven") : null,
+        found.length
+          ? h("div.row.wrap.center", found.map((t) =>
+            h("button.btn.timer-start", { onclick: () => startTimer(t.seconds, `Step ${index} · ${t.label}`) }, `⏰ Start ${t.label} timer`)))
           : null,
       ].filter(Boolean));
     }
@@ -542,8 +611,11 @@ export function viewCook({ match, params, setCleanup }) {
     document.removeEventListener("visibilitychange", wake);
     keepScreenOn(false);
     stopSpeaking();
+    // Timers keep going after cook-along, down at the bottom of the next screen.
+    setTimeout(drawTimers, 0);
   });
   show(0);
+  setTimeout(drawTimers, 0);
   return h("div.screen.cook",
     h("header.cook-top",
       h("button.icon-btn", { "aria-label": "Stop cooking", onclick: () => go(`#/dish/${dish.id}`, { replace: true }) }, "✕"),
@@ -553,7 +625,7 @@ export function viewCook({ match, params, setCleanup }) {
     videoPanel,
     dots,
     stage,
-    h("div.cook-bar", backBtn, readBtn, nextBtn),
+    h("div.cook-dock", h("div.cook-timers"), h("div.cook-bar", backBtn, readBtn, nextBtn)),
   );
 }
 

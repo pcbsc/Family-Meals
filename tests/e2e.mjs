@@ -111,7 +111,7 @@ async function check(name, fn) {
     await fn();
     console.log(`ok ${step} - ${name}`);
   } catch (err) {
-    console.log(`not ok ${step} - ${name}\n  ${String(err.message).split("\n")[0]}`);
+    console.log(`not ok ${step} - ${name}\n  ${String(err.message).split("\n").slice(0, 3).join("\n  ")}`);
     failed.push(name);
     await page.screenshot({ path: join(ROOT, `tests/failure-${step}.png`) }).catch(() => {});
     await page.keyboard.press("Escape").catch(() => {});
@@ -351,8 +351,15 @@ await check("cook-along shows steps with timers and no stray text", async () => 
   await page.getByText("Start 30 minutes timer").waitFor();
   assert.ok(!(await page.locator(".cook-stage").textContent()).includes("null"));
   await page.getByText("Start 30 minutes timer").click();
-  await page.locator(".timer-pill").waitFor();
-  await page.locator(".timer-pill [aria-label='Stop timer']").click();
+  await page.locator(".timer-pill", { hasText: "Step 3 · 30 minutes" }).waitFor();
+  // Step 5's timer runs alongside the marinade's, instead of stopping it.
+  await page.getByText("Next ▶").click();
+  await page.getByText("Next ▶").click();
+  await page.locator(".timer-start").first().click();
+  assert.equal(await page.locator(".timer-pill").count(), 2);
+  // The step shows its own amounts and a job for the kids.
+  await page.locator(".kid-job").waitFor();
+  while (await page.locator(".timer-pill").count()) await page.locator(".timer-pill [aria-label^='Stop ']").first().click();
   await page.getByLabel("Stop cooking").click();
   await page.locator(".dish-title").waitFor();
 });
@@ -416,6 +423,10 @@ await check("a grown-up PIN protects settings", async () => {
   await page.getByText("Set a PIN").click();
   await page.locator(".pin-input").fill("1234");
   await page.getByText("Save PIN").click();
+  // Setting it doesn't lock the grown-up out straight away; ten minutes later it asks.
+  await page.locator(".toast", { hasText: "PIN saved" }).waitFor();
+  assert.equal(await page.getByText("Grown-ups only").count(), 0);
+  await page.evaluate(async () => (await import("./js/ui.js")).unlockGrownUp(0));
   await page.goto(BASE + "#/today");
   await page.locator(".meal-cards").waitFor();
   await page.locator(".gear").click();
@@ -576,6 +587,10 @@ await check("kids pick today's lunch from the choices", async () => {
 await check("a kid makes a wish and the grown-ups see it", async () => {
   await page.getByText("I want to eat…").click();
   await sheet().locator(".avatar-btn", { hasText: "Kiddo" }).click();
+  // A dozen big pictures first; every dish is one tap further.
+  await sheet().locator(".wish-grid .tile").nth(11).waitFor();
+  assert.equal(await sheet().locator(".wish-grid .tile").count(), 12);
+  await sheet().getByRole("button", { name: /See all \d+ dishes/ }).click();
   await sheet().locator(".tile", { hasText: "Japchae" }).click();
   await page.locator(".toast", { hasText: "Got it, Kiddo" }).waitFor();
   await page.locator(".tabbar a[data-tab=week]").click();
@@ -907,12 +922,27 @@ await check("Healthy, Mild/Spicy and grams switches change the recipe, steps and
   await line("extra for spice lovers").waitFor();
   await page.locator(".seg", { hasText: "Grams" }).click();
   await line("640 g cooked brown rice").waitFor();
+  // Healthy and spice are just for this recipe; grams are for every recipe.
+  await page.locator(".way-own", { hasText: "Just for this recipe" }).waitFor();
   await page.goto(BASE + "#/dish/seed-gochujang-salmon");
   await page.locator(".steps li", { hasText: "220°C" }).waitFor();
-  // Switches are saved for the family and the shopping list follows them.
-  await page.goto(BASE + `#/shop?w=${nextWeek.start}`);
+  assert.equal(await page.getByRole("switch", { name: /Healthy/ }).getAttribute("aria-checked"), "false", "another recipe keeps the family's way");
+  assert.equal(await page.locator(".way-own").count(), 0);
+  // The shopping list buys this recipe its own way.
+  await page.evaluate(async () => (await import("./js/store.js")).addRecipeToShopping("seed-kimchi-fried-rice", 4));
+  await page.goto(BASE + "#/shop");
   await page.locator(".list-for", { hasText: "With healthy swaps" }).waitFor();
-  await page.evaluate(async () => (await import("./js/store.js")).saveSettings({ healthy: false, spice: "medium", metric: false }));
+  await page.locator(".shop-item", { hasText: "brown rice" }).first().waitFor();
+  await page.evaluate(async () => {
+    const { thisWeeksShopping, saveShopping, saveSettings } = await import("./js/store.js");
+    const shop = thisWeeksShopping();
+    await saveShopping({ ...shop, recipes: (shop.recipes || []).filter((r) => r.dishId !== "seed-kimchi-fried-rice") });
+    await saveSettings({ metric: false });
+  });
+  // "Use our usual way" goes back to the family's switches.
+  await page.goto(BASE + "#/dish/seed-kimchi-fried-rice");
+  await page.getByRole("button", { name: "Use our usual way" }).click();
+  await line("4 cups cooked rice").waitFor();
   await page.goto(BASE + "#/dish/seed-gochujang-salmon");
   await page.locator(".steps li", { hasText: "425°F" }).waitFor();
 });
@@ -944,17 +974,152 @@ await check("Brave Bites: a kid's first taste of a dish earns a sticker", async 
   await page.goto(BASE + "#/dish/seed-dakgangjeong");
   await page.locator(".action", { hasText: "Rate" }).click();
   await page.locator("[aria-label='Kiddo: Yummy']").click();
+  // A face alone isn't a sticker (a grown-up may be rating a dish the kid knows); "first time" is.
+  assert.equal(await page.locator(".toast", { hasText: "Brave Bite!" }).count(), 0);
+  await sheet().getByRole("button", { name: /First time Kiddo tried it/ }).click();
   await page.locator(".toast", { hasText: "Brave Bite! Kiddo got a" }).waitFor();
   // Changing the face isn't a new sticker.
   await page.locator("[aria-label='Kiddo: Love it!']").click();
-  await page.waitForTimeout(150);
-  assert.equal(await page.locator(".toast", { hasText: "Brave Bite!" }).count(), 1);
+  assert.equal(await sheet().getByRole("button", { name: /First time Kiddo/ }).count(), 0);
   await sheet().getByText("Done").click();
   await page.goto(BASE + "#/today");
   await page.locator(".brave").click();
   await page.locator(".kid-stickers", { hasText: "Kiddo" }).waitFor();
   await page.locator(".sticker[aria-label*='Sweet Crispy Chicken']").waitFor();
   await page.getByText("more for a prize").waitFor();
+});
+
+await check("Brave Foods: every try is a sticker, up to 12, and ten stickers win a dinner pick", async () => {
+  await page.goto(BASE + "#/stickers");
+  const kid = page.locator(".kid-stickers", { hasText: "Kiddo" });
+  await kid.getByRole("button", { name: "Pick" }).click();
+  await sheet().getByRole("button", { name: "🔍 Find another dish" }).click();
+  await sheet().getByLabel("Search dishes").fill("Seasoned Spinach");
+  await sheet().locator(".tile", { hasText: "Seasoned Spinach" }).click();
+  await kid.locator(".brave-food", { hasText: "Seasoned Spinach" }).waitFor();
+  await kid.getByText("0 of 12 tries").waitFor();
+  const before = await page.evaluate(async () => (await import("./js/store.js")).stickersFor((await import("./js/store.js")).members().find((m) => m.kid).id).length);
+  for (let i = 1; i <= 12; i++) {
+    await kid.getByRole("button", { name: "🏅 I tried it!" }).click();
+    await kid.getByText(i === 12 ? "All 12 tries!" : `${i} of 12 tries`).waitFor();
+  }
+  assert.equal(await kid.getByRole("button", { name: "🏅 I tried it!" }).count(), 0, "12 is the most");
+  // Ten stickers: a real prize button that picks a dinner, then it's used.
+  assert.ok(before + 12 >= 10);
+  await kid.getByRole("button", { name: /Tap to pick a dinner/ }).click();
+  await sheet().getByLabel("Search dishes").fill("Japchae");
+  await sheet().locator(".tile", { hasText: "Japchae" }).click();
+  await sheet().locator(".plan-day").first().getByRole("button", { name: /^Dinner/ }).click();
+  const swap = sheet().getByRole("button", { name: /Have Japchae instead/ });
+  if (await swap.count()) await swap.click();
+  await page.locator(".toast", { hasText: "Japchae is" }).waitFor();
+  await kid.locator(".prize-count").waitFor();
+  assert.equal(await kid.getByRole("button", { name: /Tap to pick a dinner/ }).count(), 0, "the prize was used");
+});
+
+await check("We ate it: one sheet for faces, Brave Bites, leftovers and a note", async () => {
+  await page.evaluate(async () => {
+    const { setSlotDishes, members, setBraveFoods } = await import("./js/store.js");
+    const { dateKey, addDays } = await import("./js/planner.js");
+    await setSlotDishes(dateKey(addDays(new Date(), -1)), "dinner", ["seed-bibimbap"]);
+    await setSlotDishes(dateKey(addDays(new Date(), 1)), "lunch", []);
+    await setBraveFoods(members().find((m) => m.kid).id, ["seed-bibimbap"]);
+  });
+  await page.goto(BASE + "#/today");
+  await page.locator(".last-night", { hasText: "Last night's dinner: Bibimbap" }).click({ position: { x: 5, y: 5 } }).catch(() => {});
+  await page.getByRole("button", { name: "🍽️ We ate it!" }).click();
+  await sheet().locator("[aria-label='Kiddo: Okay']").click();
+  await sheet().getByRole("button", { name: "🏅 Kiddo tried the Bibimbap!" }).click();
+  await page.locator(".toast", { hasText: "Brave Bite! Kiddo got a" }).waitFor();
+  await sheet().getByText("1 of 12 tries").waitFor();
+  await sheet().getByRole("button", { name: "🍱 Leftovers for lunch tomorrow" }).click();
+  await sheet().getByText("Lunch tomorrow!").waitFor();
+  await sheet().getByLabel("📝 A note for next time").fill("Kiddo wanted more egg");
+  await sheet().getByRole("button", { name: "✅ Done" }).click();
+  await page.waitForFunction(() => !document.querySelector(".last-night"));
+  const lunch = await page.evaluate(async () => {
+    const { getSlot } = await import("./js/store.js");
+    const { dateKey, addDays } = await import("./js/planner.js");
+    return getSlot(dateKey(addDays(new Date(), 1)), "lunch");
+  });
+  assert.equal(lunch.items[0].dishId, "seed-bibimbap");
+  assert.equal(lunch.items[0].leftover, true);
+  await page.goto(BASE + "#/dish/seed-bibimbap");
+  await page.locator(".last-note", { hasText: "Kiddo wanted more egg" }).waitFor();
+});
+
+await check("moving a dinner cooked double takes its leftover lunch along", async () => {
+  const days = await page.evaluate(async (start) => {
+    const { setSlotDishes, planLeftovers } = await import("./js/store.js");
+    const { dateKey, addDays, fromKey } = await import("./js/planner.js");
+    const k = (n) => dateKey(addDays(fromKey(start), n));
+    for (const n of [4, 5, 6]) await setSlotDishes(k(n), "lunch", []);
+    await setSlotDishes(k(4), "dinner", ["seed-bulgogi"]);
+    await setSlotDishes(k(5), "dinner", []);
+    await planLeftovers(k(4), "dinner", "seed-bulgogi");
+    return { thu: k(4), fri: k(5), sat: k(6) };
+  }, nextWeek.start);
+  assert.equal((await slotOf(days.fri, "lunch")).items[0].leftover, true);
+  await page.goto(BASE + `#/week?w=${nextWeek.start}`);
+  await openSpot(days.thu, "dinner");
+  await sheet().getByRole("button", { name: /^Fri/ }).click();
+  await page.locator(".toast", { hasText: "Moved to Friday" }).waitFor();
+  assert.equal(await slotOf(days.fri, "lunch"), null, "no leftovers the day after an empty dinner");
+  const sat = await slotOf(days.sat, "lunch");
+  assert.equal(sat.items[0].dishId, "seed-bulgogi");
+  assert.equal(sat.items[0].leftover, true);
+  assert.equal((await slotOf(days.fri, "dinner")).items[0].extraFor, days.sat);
+  // Taking the dinner off takes the leftovers with it.
+  await openSpot(days.fri, "dinner");
+  await sheet().getByRole("button", { name: "Remove Beef Bulgogi" }).click();
+  await page.locator(".toast", { hasText: "was taken off" }).waitFor();
+  assert.equal(await slotOf(days.sat, "lunch"), null);
+  // Undo puts both back.
+  await page.locator(".toast-action", { hasText: "Undo" }).last().click();
+  await page.waitForFunction(async (k) => (await import("./js/store.js")).getSlot(k, "lunch")?.items[0]?.leftover === true, days.sat);
+  await closeSheets();
+});
+
+await check("an allergy shows on the recipe and keeps the dish out of the ideas", async () => {
+  await page.goto(BASE + "#/settings");
+  await page.getByRole("button", { name: "Kiddo's food: allergies, likes, spice" }).click();
+  await sheet().getByLabel("⚠️ Allergies").fill("peanuts");
+  await sheet().getByLabel("🙅 Doesn't like").fill("mushrooms");
+  await sheet().getByRole("button", { name: "😊 Mild" }).click();
+  await sheet().getByRole("button", { name: "Save" }).click();
+  await page.locator(".food-summary", { hasText: "⚠️ peanuts" }).waitFor();
+  await page.goto(BASE + "#/dish/seed-chicken-satay");
+  await page.locator(".allergy-warning", { hasText: "Kiddo can't have peanuts" }).waitFor();
+  await page.goto(BASE + "#/dish/seed-japchae");
+  await page.locator(".dislike-note", { hasText: "Kiddo doesn't like mushrooms" }).waitFor();
+  const unsafe = await page.evaluate(async () => {
+    const { dishList, safeForAll } = await import("./js/store.js");
+    const safe = dishList().filter(safeForAll);
+    return { hidden: dishList().length - safe.length, satay: safe.some((d) => d.id === "seed-chicken-satay") };
+  });
+  assert.ok(unsafe.hidden >= 3, `${unsafe.hidden} peanut dishes left out`);
+  assert.equal(unsafe.satay, false);
+  // Mild for Kiddo, medium for the family: cook-along says when to scoop out their share.
+  await page.goto(BASE + "#/dish/seed-tteokbokki");
+  await page.locator(".steps .step-note", { hasText: "Scoop out a mild share for Kiddo" }).waitFor();
+  await page.evaluate(async () => {
+    const { state, saveSettings } = await import("./js/store.js");
+    await saveSettings({ members: state.settings.members.map(({ allergies, dislikes, spice, ...m }) => m) });
+  });
+});
+
+await check("what we have: fresh food goes back on the list after a week unless it's still there", async () => {
+  await page.evaluate(async () => {
+    const { saveSettings } = await import("./js/store.js");
+    const old = Date.now() - 9 * 24 * 3600 * 1000;
+    await saveSettings({ have: ["carrots", "soy sauce"], haveAt: { carrot: old, "soy sauce": old } });
+  });
+  await page.goto(BASE + "#/fridge");
+  await page.locator(".stale-have", { hasText: "carrots" }).waitFor();
+  assert.equal(await page.locator(".stale-have", { hasText: "soy sauce" }).count(), 0, "a bottle of soy sauce doesn't go off in a week");
+  await page.getByRole("button", { name: "We still have carrots" }).click();
+  await page.waitForFunction(() => !document.querySelector(".stale-have"));
+  await page.evaluate(async () => (await import("./js/store.js")).saveSettings({ have: [], haveAt: {} }));
 });
 
 await check("done shopping: ticked things go into what we have, and are set aside next time", async () => {

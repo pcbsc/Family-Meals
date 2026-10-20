@@ -3,10 +3,11 @@
 import { h, openSheet, toast, confetti, confirmSheet, clearChildren, prettyDate, once, downloadFile, minutesText } from "../ui.js";
 import { MEALS, cuisineOf } from "../seed.js";
 import { dateKey, fromKey, addDays, weekStart, weekDays, fillWithFavorites, isFavorite, suggestDishes, weekCalendar } from "../planner.js";
+import { keyIngredients } from "../recipe.js";
 import {
   state, enabledMeals, getSlot, slotDishes, saveSlot, setSlotDishes, saveDish, dishList, members, memberById,
-  removeWish, wishLabel, planHistory, go, refresh, snapshotSlots, restoreSlots, moveSlot, planLeftovers,
-  freezer, planFromFreezer, cookPrefs,
+  removeWish, wishLabel, planHistory, go, refresh, snapshotSlots, snapshotDays, restoreSlots, moveSlot, moveSpots, planLeftovers,
+  freezer, planFromFreezer, cookPrefs, lunchInTheWay, copyWeek, haveNames, safeForAll,
 } from "../store.js";
 import { grownUp, dishArt, pickDishes, stepper, chip, progressSheet, needKeySheet, icon } from "../components.js";
 
@@ -92,10 +93,12 @@ export function slotSheet(dayKey, meal) {
       const planned = new Set(items.map((i) => i.dish.id));
       const suggest = () => {
         const opts = { meal, cuisine: main ? cuisineOf(main) : "", cuisineOf };
-        let next = suggestDishes(dishList(), { ...opts, exclude: new Set([...planned, ...shown]) });
+        // Ideas never include a dish someone in the family is allergic to.
+        const safe = dishList().filter(safeForAll);
+        let next = suggestDishes(safe, { ...opts, exclude: new Set([...planned, ...shown]) });
         if (next.length < 4 && shown.size) {
           shown = new Set();
-          next = suggestDishes(dishList(), { ...opts, exclude: planned });
+          next = suggestDishes(safe, { ...opts, exclude: planned });
         }
         for (const d of next) shown.add(d.id);
         return next;
@@ -129,7 +132,7 @@ export function slotSheet(dayKey, meal) {
             h("h3", "Move to another day"),
             h("div.day-chips", others.map((k) => h("button.chip.day-chip", {
               onclick: async () => {
-                const snap = snapshotSlots([[dayKey, meal], [k, meal]]);
+                const snap = snapshotSlots(moveSpots(dayKey, k, meal));
                 await moveSlot(dayKey, k, meal);
                 await close();
                 changed(`Moved to ${prettyDate(fromKey(k), { weekday: "long" })}.`, snap, "📆");
@@ -146,6 +149,8 @@ export function slotSheet(dayKey, meal) {
         extras.push(h("button.leftover-row", {
           onclick: async () => {
             const tomorrow = addDays(fromKey(dayKey), 1);
+            const inTheWay = lunchInTheWay(dayKey);
+            if (inTheWay.length && !(await confirmSheet(`Tomorrow's lunch is ${inTheWay.map((i) => i.dish.name).join(" + ")}. Have leftovers instead?`, { yes: "Leftovers instead" }))) return;
             const snap = snapshotSlots([[dayKey, "dinner"], [tomorrow, "lunch"]]);
             await planLeftovers(dayKey, "dinner", items[0].dish.id);
             changed(`Cooking double: tomorrow's lunch is ${items[0].dish.name} leftovers.`, snap, "🍱");
@@ -260,12 +265,15 @@ async function fillFavoritesNow(days) {
   if (!state.dishes.size) return toast("Add some dishes to the menu first.", { emoji: "📖" });
   const recentIds = new Set(planHistory(10).keys());
   const wishes = state.wishes.filter((w) => w.dishId);
-  const picks = fillWithFavorites({ dishes: dishList(), empty, wishes, recentIds });
-  for (const p of picks) await setSlotDishes(p.date, p.meal, [p.dishId]);
-  const planned = new Set(picks.map((p) => p.dishId));
-  for (const w of wishes) if (planned.has(w.dishId)) await removeWish(w.id);
+  // What's already planned this week, so the new dinners balance with it.
+  const planned = days.flatMap((d) => MEALS.flatMap((m) => slotDishes(getSlot(dateKey(d), m.key)).map((i) => ({ date: dateKey(d), meal: m.key, dishId: i.dish.id }))));
+  const snap = snapshotDays(days);
+  const picks = fillWithFavorites({ dishes: dishList().filter(safeForAll), empty, wishes, recentIds, planned, cuisineOf });
+  for (const p of picks) await setSlotDishes(p.date, p.meal, p.sideId ? [p.dishId, p.sideId] : [p.dishId]);
+  const chosen = new Set(picks.map((p) => p.dishId));
+  for (const w of wishes) if (chosen.has(w.dishId)) await removeWish(w.id);
   confetti(["🎲", "⭐", "🍚", "🥕"]);
-  toast(`Filled ${picks.length} meals with family favorites!`, { emoji: "🎲" });
+  changed(`Filled ${picks.length} meals with family favorites!`, snap, "🎲");
   refresh();
 }
 
@@ -286,12 +294,21 @@ function buildPlanRequest({ slotsToFill, days, note, newIdeas }) {
   }
   const people = members();
   const ratingWords = { 4: "love it", 3: "yummy", 2: "okay", 1: "no thanks" };
+  const list = (text) => String(text || "").split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
   return {
     today: dateKey(new Date()),
     family: {
-      people: people.map((p) => ({ name: p.name, kid: !!p.kid })),
+      people: people.map((p) => ({
+        name: p.name,
+        kid: !!p.kid,
+        allergies: list(p.allergies).length ? list(p.allergies) : undefined,
+        dislikes: list(p.dislikes).length ? list(p.dislikes) : undefined,
+        spice: p.spice || undefined,
+      })),
       usualServings: state.settings.servings,
     },
+    haveAtHome: haveNames(),
+    freezer: freezer().map((f) => ({ dishId: f.dishId, name: state.dishes.get(f.dishId)?.name, meals: f.meals })),
     foodNotes: state.settings.foodNotes,
     cuisineMix: state.settings.cuisineMix,
     spiceLevel: cookPrefs().spice,
@@ -316,6 +333,8 @@ function buildPlanRequest({ slotsToFill, days, note, newIdeas }) {
         cuisine: cuisineOf(d),
         categories: d.categories,
         spicy: d.spicy,
+        minutes: (d.prepMinutes || 0) + (d.cookMinutes || 0) || undefined,
+        mainIngredients: [...keyIngredients(d)].slice(0, 6),
         favorite: isFavorite(d),
         ratings: ratings.length ? ratings : undefined,
         lastPlanned: h28?.last,
@@ -478,16 +497,22 @@ function previewPlan(plan, retry) {
               const saved = await saveDish({ ...recipe, addedBy: "claude-plan" });
               ids.set(key, saved.id);
             }
+            const snap = snapshotSlots(plan.slots.map((s) => [s.date, s.meal]));
             const planned = new Set();
             for (const s of plan.slots) {
               const dishIds = s.dishes.map((ref) => (ref.startsWith("new:") ? ids.get(ref.slice(4)) : ref)).filter(Boolean);
               dishIds.forEach((id) => planned.add(id));
-              await setSlotDishes(s.date, s.meal, dishIds);
+              // Claude picked a freezer meal for a busy night: take it from the freezer, nothing to buy.
+              if (/^from the freezer/i.test(s.why || "") && dishIds.length === 1 && freezer().some((f) => f.dishId === dishIds[0])) {
+                await planFromFreezer(s.date, s.meal, dishIds[0]);
+              } else {
+                await setSlotDishes(s.date, s.meal, dishIds);
+              }
             }
             for (const w of state.wishes) if (w.dishId && planned.has(w.dishId)) await removeWish(w.id);
             await close();
             confetti();
-            toast("Our week is planned!", { emoji: "✨" });
+            changed("Our week is planned!", snap, "✨");
             refresh();
           }),
         }, "✅ Use this plan"),
@@ -497,19 +522,10 @@ function previewPlan(plan, retry) {
 }
 
 async function copyLastWeek(start) {
-  const prevDays = weekDays(addDays(start, -7));
-  let copied = 0;
-  for (let i = 0; i < 7; i++) {
-    for (const m of MEALS) {
-      const from = getSlot(dateKey(prevDays[i]), m.key);
-      const items = slotDishes(from);
-      const target = addDays(start, i);
-      if (!items.length || slotDishes(getSlot(dateKey(target), m.key)).length) continue;
-      await saveSlot({ date: dateKey(target), meal: m.key, items: from.items, choices: [] });
-      copied++;
-    }
-  }
-  toast(copied ? `Copied ${copied} meals from last week.` : "Nothing to copy from last week.", { emoji: "📋" });
+  const snap = snapshotDays(weekDays(start));
+  const copied = await copyWeek(addDays(start, -7), start);
+  if (copied) changed(`Copied ${copied} meals from last week.`, snap, "📋");
+  else toast("Nothing to copy from last week.", { emoji: "📋" });
   refresh();
 }
 
@@ -557,10 +573,12 @@ function moreSheet(start, days) {
           await close();
           if (!(await grownUp())) return;
           if (!(await confirmSheet("Clear every meal this week?", { yes: "Clear the week", danger: true }))) return;
+          const snap = snapshotDays(days);
           for (const d of days) for (const m of MEALS) {
             const slot = getSlot(dateKey(d), m.key);
             if (slot) await saveSlot({ ...slot, items: [], choices: [] });
           }
+          changed("The week is cleared.", snap, "🧹");
           refresh();
         },
       }, "🧹 Clear this week"),

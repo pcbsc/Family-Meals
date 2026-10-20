@@ -199,6 +199,11 @@ let unlockedUntil = 0;
  * Resolves true when a grown-up has entered the PIN (or there's no PIN).
  * onReset runs when a grown-up answers the "Forgot the PIN?" sum; it should clear the PIN.
  */
+/** The grown-up just typed the PIN somewhere else (like setting it): don't ask again for a while (0 locks now). */
+export function unlockGrownUp(ms = 10 * 60 * 1000) {
+  unlockedUntil = Date.now() + ms;
+}
+
 export function grownUpCheck(pin, { onReset } = {}) {
   if (!pin || Date.now() < unlockedUntil) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -346,13 +351,14 @@ export function ding(times = 3) {
   navigator.vibrate?.([300, 150, 300, 150, 300]);
 }
 
-export function speak(text) {
-  if (appSpeak(text)) return true;
+/** Reads text aloud; lang "ko-KR" says a Korean dish name the Korean way. */
+export function speak(text, { lang = "en-US" } = {}) {
+  if (appSpeak(text, lang)) return true;
   if (!("speechSynthesis" in window)) return false;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.92;
-  u.lang = "en-US";
+  u.rate = lang === "en-US" ? 0.92 : 0.8;
+  u.lang = lang;
   speechSynthesis.speak(u);
   return true;
 }

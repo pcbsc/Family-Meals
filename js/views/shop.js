@@ -3,9 +3,11 @@
 // things go into "what we have" when shopping's done, and the list can be shared
 // so both grown-ups' phones tick the same list.
 import { h, toast, clearChildren, prettyDate } from "../ui.js";
-import { buildGroceryList, AISLES, cookedLines, haveCovers, normalizeItemName, aisleFor } from "../recipe.js";
+import { buildGroceryList, AISLES, haveCovers, normalizeItemName, aisleFor } from "../recipe.js";
 import { dateKey, fromKey, addDays, weekStart, weekDays } from "../planner.js";
-import { state, getSlot, slotDishes, shoppingFor, saveShopping, saveSettings, cookPrefs, go, db } from "../store.js";
+import {
+  state, getSlot, slotDishes, shoppingFor, saveShopping, saveSettings, cookPrefs, ourLines, go, db, haveItems, addHave, removeHave,
+} from "../store.js";
 import { shareConfig, readList, writeList, startList, tickId, extraId } from "../share.js";
 import { MEALS } from "../seed.js";
 import { icon, dishArt } from "../components.js";
@@ -19,7 +21,6 @@ let lastRemote = null;
 /** Our list for a week: planned meals (not leftovers or freezer meals) and added recipes. */
 function weekItems(start, shop, { onlyAhead }) {
   const today = dateKey(new Date());
-  const prefs = cookPrefs();
   const planned = [];
   for (const day of weekDays(start)) {
     if (onlyAhead && dateKey(day) < today) continue;
@@ -33,36 +34,41 @@ function weekItems(start, shop, { onlyAhead }) {
   const added = (shop.recipes || [])
     .map((r) => ({ dish: state.dishes.get(r.dishId), servings: r.servings }))
     .filter((r) => r.dish);
-  // The family's way of cooking: healthier swaps, nothing that mild leaves out.
+  // Each dish cooked our way (or its own): healthier swaps, nothing that mild leaves out.
   const ourWay = (list) => list.map(({ dish, servings }) => ({
-    dish: { ...dish, ingredients: cookedLines(dish, prefs).lines.filter((l) => !l.off).map((l) => l.line) },
+    dish: { ...dish, ingredients: ourLines(dish).lines.filter((l) => !l.off).map((l) => l.line) },
     servings,
   }));
-  const haves = (state.settings.have || []).map(normalizeItemName).filter(Boolean);
-  const items = buildGroceryList(ourWay([...planned, ...added]), { metric: prefs.metric })
-    .map((i) => ({ ...i, have: !i.pantry && haves.some((x) => haveCovers(x, i.key)) }));
+  // What we have hides things from the list; fresh food only for a week after it was bought.
+  const haves = haveItems().filter((x) => !x.stale && x.key);
+  const items = buildGroceryList(ourWay([...planned, ...added]), { metric: cookPrefs().metric })
+    .map((i) => {
+      const got = i.pantry ? null : haves.find((x) => haveCovers(x.key, i.key));
+      return { ...i, have: !!got, haveAt: got?.at || null };
+    });
   return { planned, added, items };
 }
 
 const forShare = (items) => items.map(({ key, name, amount, aisle, pantry, have, dishes }) =>
   ({ key, name, amount: amount || "", aisle, pantry: !!pantry, have: !!have, dishes: Array.isArray(dishes) ? dishes.join(", ") : dishes || "" }));
 
+/** The aisle for something typed in: milk goes with the eggs, paper towels stay in "Other things". */
+const extraAisle = (text) => aisleFor(`${normalizeItemName(text)} ${String(text).toLowerCase()}`);
+
 /** What "Done shopping" puts in "what we have": ticked foods (not paper towels). */
 function boughtNames(items, extras, ticked) {
   const names = items.filter((i) => !i.pantry && ticked(i.key)).map((i) => i.key);
-  for (const x of extras) if (x.checked && aisleFor(x.text) !== "other") names.push(x.text.toLowerCase());
+  for (const x of extras) if (x.checked && extraAisle(x.text) !== "other") names.push(x.text.toLowerCase().replace(/\s*\([^)]*\)/g, ""));
   return [...new Set(names)];
 }
 
-async function addToHave(names) {
-  const have = [...(state.settings.have || [])];
-  const known = new Set(have.map(normalizeItemName));
-  for (const n of names) {
-    if (known.has(normalizeItemName(n))) continue;
-    known.add(normalizeItemName(n));
-    have.push(n);
-  }
-  await saveSettings({ have: have.slice(-80) });
+const addToHave = (names) => addHave(names);
+
+/** "since Tue" for this week, "since Oct 12" before that. */
+function sinceText(at) {
+  if (!at) return "";
+  const days = (Date.now() - at) / (24 * 3600 * 1000);
+  return `since ${prettyDate(new Date(at), days < 6 ? { weekday: "short" } : { month: "short", day: "numeric" })}`;
 }
 
 export function viewShop({ params, setCleanup }) {
@@ -265,7 +271,7 @@ export function viewShop({ params, setCleanup }) {
       body.append(h("section.card.list-for",
         h("h2", `📖 For ${n} dish${n === 1 ? "" : "es"}`),
         h("p.muted", `${toBuy} thing${toBuy === 1 ? "" : "s"} to buy, all combined and sorted by aisle.`,
-          cookPrefs().healthy ? " 🥗 With healthy swaps." : ""),
+          [...mine.planned, ...mine.added].some(({ dish }) => cookPrefs(dish).healthy) ? " 🥗 With healthy swaps." : ""),
         h("div.row.wrap",
           [...counts.values()].map(({ dish, times }) => h("span.chip.static.dish-chip", dishArt(dish, { className: "art-chip" }), `${dish.name}${times > 1 ? ` ×${times}` : ""}`)),
           mine.added.map(({ dish, servings }) => h("button.chip.on", {
@@ -307,7 +313,7 @@ export function viewShop({ params, setCleanup }) {
 
     for (const aisle of AISLES) {
       const inAisle = items.filter((i) => i.aisle === aisle.key && !i.pantry && !i.have);
-      const extras = aisle.key === "other" ? list.extras : [];
+      const extras = list.extras.filter((x) => extraAisle(x.text) === aisle.key);
       if (!inAisle.length && !extras.length) continue;
       body.append(h(`section.card.aisle.aisle-${aisle.key}`,
         h("h2", AISLE_ICONS[aisle.key] ? icon(AISLE_ICONS[aisle.key], "aisle-icon") : h("span.aisle-emoji", aisle.emoji), aisle.label),
@@ -321,11 +327,13 @@ export function viewShop({ params, setCleanup }) {
       body.append(h("details.card.aisle.have-these",
         h("summary", h("h2", icon("check-green", "summary-icon"), "We have these"), h("span.muted", `${have.length} thing${have.length === 1 ? "" : "s"} already at home`)),
         h("ul.shop-list", have.map((item) => h("li.shop-item",
-          h("span.shop-text.grow", h("span.shop-name", item.name), item.amount ? h("span.shop-amount", item.amount) : null),
+          h("span.shop-text.grow", h("span.shop-name", item.name),
+            item.haveAt ? h("span.shop-for", sinceText(item.haveAt)) : null),
+          item.amount ? h("span.shop-amount", item.amount) : null,
           member ? null : h("button.btn.soft.small", {
             onclick: async () => {
               const need = normalizeItemName(item.key);
-              await saveSettings({ have: (state.settings.have || []).filter((x) => !haveCovers(normalizeItemName(x), need)) });
+              await removeHave((name, key) => haveCovers(key, need));
               toast(`${item.name} is back on the list.`, { emoji: "🛒" });
               draw();
             },
@@ -407,7 +415,7 @@ async function sendList(items, list) {
   const lines = [];
   for (const aisle of AISLES) {
     const left = items.filter((i) => i.aisle === aisle.key && !i.pantry && !i.have && !list.ticked(i.key));
-    const extras = aisle.key === "other" ? list.extras.filter((e) => !e.checked) : [];
+    const extras = list.extras.filter((e) => !e.checked && extraAisle(e.text) === aisle.key);
     if (!left.length && !extras.length) continue;
     lines.push(`${aisle.emoji} ${aisle.label}`);
     for (const i of left) lines.push(`☐ ${i.name}${i.amount ? ` (${i.amount})` : ""}`);

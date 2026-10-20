@@ -3,9 +3,10 @@
 import { h, openSheet, toast, confetti, colorFor, clearChildren, prettyDate, grownUpCheck, once } from "./ui.js";
 import { MEALS, FACES } from "./seed.js";
 import { dateKey, addDays, isFavorite } from "./planner.js";
+import { foodsIn } from "./recipe.js";
 import {
   state, members, memberById, enabledMeals, dishList, rating, rateDish, photoUrl, getSlot,
-  setSlotDishes, slotDishes, addWish, saveSettings, go, refresh, stickersFor,
+  setSlotDishes, slotDishes, addWish, saveSettings, go, refresh, snapshotSlots, restoreSlots, addBraveTry, foodWarnings,
 } from "./store.js";
 
 /** Asks for the grown-up PIN if one is set. A forgotten PIN can be reset by answering a sum. */
@@ -58,8 +59,10 @@ export function dishTile(dish, { onclick, selected = false, small = false } = {}
   const avg = rating(dish);
   const face = faceFor(avg);
   const art = dishArt(dish);
-  // The video badge sits on the picture's corner.
+  // The video badge sits on the picture's corner; an allergy in the family, on the other one.
   if (dish.videoUrl && !small) art.append(h("span.tile-video", { "aria-label": "Has a video" }, "▶"));
+  const allergy = foodWarnings(dish).allergies;
+  if (allergy.length) art.append(h("span.tile-allergy", { title: allergy.map((a) => `${a.who}: ${a.food}`).join(", "), "aria-label": `Allergy: ${allergy.map((a) => `${a.who} (${a.food})`).join(", ")}` }, "⚠️"));
   return h(`button.tile${small ? ".small" : ""}${selected ? ".selected" : ""}`, { type: "button", onclick },
     art,
     isFavorite(dish) ? h("span.tile-heart", { "aria-label": "Family favorite" }, "❤️") : null,
@@ -104,43 +107,71 @@ export function chip(label, { on = false, onclick, emoji = "" } = {}) {
 
 // ---------- Rating ----------
 
-export function rateSheet(dish, { onDone } = {}) {
-  openSheet((close) => {
-    const body = h("div.stack");
-    const draw = () => {
-      clearChildren(body);
-      body.append(
-        h("div.rate-head", dishArt(dish, { className: "art-sm" }), h("div", h("h3", dish.name), h("p.muted", "Tap your face!"))),
-        ...members().map((m) => {
-          const current = state.dishes.get(dish.id)?.ratings?.[m.id];
-          return h("div.rate-row",
-            h("span.rate-who", h("span.avatar", m.avatar), h("span", m.name)),
-            h("div.faces", FACES.map((f) =>
-              h(`button.face${current === f.score ? ".on" : ""}`, {
-                type: "button",
-                "aria-label": `${m.name}: ${f.label}`,
-                onclick: async () => {
-                  const brave = await rateDish(dish.id, m.id, f.score);
-                  if (brave) {
-                    const mine = stickersFor(m.id);
-                    const sticker = mine.find((x) => x.dish.id === dish.id)?.sticker || { emoji: "⭐", name: "star" };
-                    confetti([sticker.emoji, "🏅", "⭐"]);
-                    toast(`Brave Bite! ${m.name} got a ${sticker.emoji} ${sticker.name} sticker for trying ${dish.name}.`, {
-                      emoji: "🏅", ms: 4000, action: { label: "See stickers", onclick: () => { close(); go("#/stickers"); } },
-                    });
-                  } else if (f.score === 4) confetti(["😍", "❤️", "⭐", "🎉"]);
-                  draw();
-                },
-              }, f.emoji),
-            )),
-          );
-        }),
-        h("button.btn.primary.wide", { onclick: () => close() }, "Done"),
+/** Gives a kid a Brave Bites sticker for trying a dish, with a cheer. Returns whether they got one. */
+export async function braveBite(kid, dish, { meal = "", onSee } = {}) {
+  const got = await addBraveTry(kid.id, dish.id, { meal });
+  if (!got) return false;
+  confetti([got.sticker.emoji, "🏅", "⭐"]);
+  toast(`Brave Bite! ${kid.name} got a ${got.sticker.emoji} ${got.sticker.name} sticker for trying ${dish.name}.`, {
+    emoji: "🏅", ms: 4000, action: { label: "See stickers", onclick: () => { onSee?.(); go("#/stickers"); } },
+  });
+  return true;
+}
+
+/** Faces for each person. A kid's first face asks "first time?", and saying yes is a sticker. */
+export function rateRows(dish, { meal = "", onSee } = {}) {
+  const box = h("div.stack");
+  const firsts = new Set();
+  const draw = () => {
+    clearChildren(box);
+    box.append(...members().map((m) => {
+      const current = state.dishes.get(dish.id)?.ratings?.[m.id];
+      return h("div.rate-row",
+        h("span.rate-who", h("span.avatar", m.avatar), h("span", m.name)),
+        h("div.faces", FACES.map((f) =>
+          h(`button.face${current === f.score ? ".on" : ""}`, {
+            type: "button",
+            "aria-label": `${m.name}: ${f.label}`,
+            onclick: async () => {
+              if (await rateDish(dish.id, m.id, f.score)) firsts.add(m.id);
+              if (f.score === 4) confetti(["😍", "❤️", "⭐", "🎉"]);
+              draw();
+            },
+          }, f.emoji),
+        )),
+        firsts.has(m.id)
+          ? h("button.btn.soft.small.first-try", {
+            onclick: once(async (e) => {
+              firsts.delete(m.id);
+              e.currentTarget.remove();
+              await braveBite(m, dish, { meal, onSee });
+            }),
+          }, `🏅 First time ${m.name} tried it? Sticker!`)
+          : null,
       );
-    };
-    draw();
-    return body;
-  }, { title: "How do we like it?", onClose: () => { onDone?.(); refresh(); } });
+    }));
+  };
+  draw();
+  return box;
+}
+
+export function rateSheet(dish, { onDone } = {}) {
+  openSheet((close) => h("div.stack",
+    h("div.rate-head", dishArt(dish, { className: "art-sm" }), h("div", h("h3", dish.name), h("p.muted", "Tap your face!"))),
+    rateRows(dish, { onSee: () => close() }),
+    h("button.btn.primary.wide", { onclick: () => close() }, "Done"),
+  ), { title: "How do we like it?", onClose: () => { onDone?.(); refresh(); } });
+}
+
+/** Red for an allergy, soft for a dislike: "Dad doesn't like mushrooms: serve them on the side". */
+export function foodWarningBox(dish) {
+  const { allergies, dislikes } = foodWarnings(dish);
+  if (!allergies.length && !dislikes.length) return null;
+  const byWho = (list) => [...new Set(list.map((x) => x.who))].map((who) => ({ who, foods: list.filter((x) => x.who === who).map((x) => x.food) }));
+  return h("div.food-warnings",
+    byWho(allergies).map(({ who, foods }) => h("p.allergy-warning", { role: "alert" }, `⚠️ Allergy: ${who} can't have ${foods.join(" or ")}. Check every ingredient and sauce.`)),
+    byWho(dislikes).map(({ who, foods }) => h("p.dislike-note", `🙅 ${who} doesn't like ${foods.join(" or ")}: leave it out of their plate, or serve it on the side.`)),
+  );
 }
 
 export function familyFaces(dish) {
@@ -248,17 +279,51 @@ export function wishFlow(presetDishId = null) {
     const stepWhat = () => {
       clearChildren(body);
       let text = "";
-      body.append(
+      // A dozen big pictures first: what this kid loves, family favorites, kid favorites.
+      const score = (d) => (d.ratings?.[who.id] || 0) * 2 + (isFavorite(d) ? 3 : 0) + ((d.categories || []).includes("kid-favorite") ? 2 : 0)
+        - ((d.categories || []).includes("side") ? 4 : 0) - (d.ratings?.[who.id] === 1 ? 10 : 0);
+      // Never a dish they're allergic to.
+      const all = dishList().filter((d) => !foodsIn(d, who.allergies).length).sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+      const grid = h("div.tile-grid.big.wish-grid", all.slice(0, 12).map((d) => dishTile(d, { onclick: () => save({ dishId: d.id }) })));
+      const more = h("button.btn.ghost.center-btn", {
+        onclick: () => {
+          more.remove();
+          grid.classList.remove("big");
+          grid.append(...all.slice(12).map((d) => dishTile(d, { small: true, onclick: () => save({ dishId: d.id }) })));
+        },
+      }, `See all ${all.length} dishes`);
+      const input = h("input.text", { placeholder: "Type it here (like 'pizza')", "aria-label": "Something new", oninput: (e) => (text = e.target.value) });
+      // Saying it is easier than typing for a 7-year-old (where the browser can listen).
+      const Listen = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const sayBtn = Listen
+        ? h("button.btn.soft", {
+          "aria-label": "Say it",
+          onclick: () => {
+            const rec = new Listen();
+            rec.lang = "en-US";
+            rec.interimResults = false;
+            sayBtn.textContent = "👂";
+            rec.onresult = (e) => {
+              text = e.results[0][0].transcript;
+              input.value = text;
+            };
+            rec.onend = () => (sayBtn.textContent = "🎤");
+            rec.onerror = () => toast("I couldn't hear that. Try again, or type it.", { emoji: "👂" });
+            rec.start();
+          },
+        }, "🎤")
+        : null;
+      body.append(...[
         h("p.big-text", `What do you want to eat, ${who.name}?`),
-        h("div.tile-grid", dishList()
-          .sort((a, b) => Number(isFavorite(b)) - Number(isFavorite(a)) || a.name.localeCompare(b.name))
-          .map((d) => dishTile(d, { small: true, onclick: () => save({ dishId: d.id }) }))),
+        grid,
+        all.length > 12 ? more : null,
         h("p.muted", "Something new?"),
         h("div.row",
-          h("input.text", { placeholder: "Type it here (like 'pizza')", oninput: (e) => (text = e.target.value) }),
+          input,
+          sayBtn,
           h("button.btn.primary", { onclick: () => text.trim() && save({ text: text.trim() }) }, "Wish!"),
         ),
-      );
+      ].filter(Boolean));
     };
     const stepWho = () => {
       clearChildren(body);
@@ -277,32 +342,61 @@ export function wishFlow(presetDishId = null) {
 
 // ---------- Plan it ----------
 
-/** Puts a dish on a day: 2 weeks of days, each with meal buttons. */
-export function planItSheet(dish) {
+/** Puts a dish on a day: 2 weeks of days, each with meal buttons. A planned meal asks: swap it, or add it as a side? */
+export function planItSheet(dish, { onPlanned } = {}) {
   openSheet((close) => {
     const days = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
     const fits = dish.meals?.length ? dish.meals : ["dinner"];
     const meals = enabledMeals().sort((a, b) => Number(fits.includes(b.key)) - Number(fits.includes(a.key)));
-    return h("div.stack",
-      h("p.muted", `When should we have ${dish.name}?`),
-      ...days.map((day, i) =>
-        h("div.plan-day",
-          h("span.plan-day-name", i === 0 ? "Today" : i === 1 ? "Tomorrow" : prettyDate(day, { weekday: "short", month: "short", day: "numeric" })),
-          h("div.row.wrap", meals.map((m) => {
-            const filled = slotDishes(getSlot(dateKey(day), m.key));
-            return h(`button.chip${fits.includes(m.key) ? ".suggest" : ""}`, {
-              onclick: async () => {
-                const append = filled.length > 0 && m.key === "dinner";
-                await setSlotDishes(day, m.key, [dish.id], { append });
-                await close();
-                toast(`${dish.name} is on ${i === 0 ? "today" : prettyDate(day, { weekday: "long" })}'s ${m.label.toLowerCase()}!`, { emoji: "📅" });
-                refresh();
-              },
-            }, m.emoji, " ", m.label, filled.length ? h("span.chip-note", ` (${filled.length})`) : null);
-          })),
+    const body = h("div.stack");
+    const dayName = (day, i) => (i === 0 ? "today" : i === 1 ? "tomorrow" : prettyDate(day, { weekday: "long" }));
+    const put = async (day, i, m, append) => {
+      const snap = snapshotSlots([[day, m.key]]);
+      await setSlotDishes(day, m.key, [dish.id], { append });
+      await close();
+      await onPlanned?.();
+      toast(append
+        ? `${dish.name} is with ${dayName(day, i)}'s ${m.label.toLowerCase()}.`
+        : `${dish.name} is ${dayName(day, i)}'s ${m.label.toLowerCase()}!`, {
+        emoji: "📅",
+        action: { label: "Undo", onclick: async () => { await restoreSlots(snap); refresh(); } },
+      });
+      refresh();
+    };
+    const ask = (day, i, m, filled) => {
+      clearChildren(body);
+      const names = filled.map((x) => x.dish.name).join(" + ");
+      body.append(
+        h("p.big-text", `${dayName(day, i).replace(/^./, (c) => c.toUpperCase())}'s ${m.label.toLowerCase()} is ${names}.`),
+        h("div.button-list",
+          h("button.btn.primary", { onclick: () => put(day, i, m, false) }, `🔄 Have ${dish.name} instead`),
+          h("button.btn.soft", { onclick: () => put(day, i, m, true) }, `➕ Add ${dish.name} as a side`),
+          h("button.btn.ghost", { onclick: drawDays }, "◀ Pick another day"),
         ),
-      ),
-    );
+      );
+    };
+    const drawDays = () => {
+      clearChildren(body);
+      body.append(
+        h("p.muted", `When should we have ${dish.name}?`),
+        ...days.map((day, i) =>
+          h("div.plan-day",
+            h("span.plan-day-name", i === 0 ? "Today" : i === 1 ? "Tomorrow" : prettyDate(day, { weekday: "short", month: "short", day: "numeric" })),
+            h("div.row.wrap", meals.map((m) => {
+              const filled = slotDishes(getSlot(dateKey(day), m.key));
+              const already = filled.some((x) => x.dish.id === dish.id);
+              return h(`button.chip${fits.includes(m.key) ? ".suggest" : ""}${already ? ".on" : ""}`, {
+                "aria-label": `${m.label} ${dayName(day, i)}${filled.length ? `: ${filled.map((x) => x.dish.name).join(" + ")}` : ""}`,
+                onclick: () => (already ? toast(`It's already on ${dayName(day, i)}'s ${m.label.toLowerCase()}.`, { emoji: "👍" })
+                  : filled.length ? ask(day, i, m, filled) : put(day, i, m, false)),
+              }, m.emoji, " ", m.label, filled.length ? h("span.chip-note", ` · ${filled[0].dish.emoji || "🍽️"}`) : null);
+            })),
+          ),
+        ),
+      );
+    };
+    drawDays();
+    return body;
   }, { title: "📅 Plan it" });
 }
 

@@ -147,3 +147,60 @@ test("try-something-else ideas fit the meal, skip what's planned and sides, and 
   assert.deepEqual(ideas.map((d) => d.id), ["e", "f", "b"], "favorite first, then the same kind; never the side, breakfast or the planned dish");
   assert.equal(suggestDishes(dishes, { meal: "dinner", count: 1, cuisineOf: (x) => x.cuisine, random: () => 0 }).length, 1);
 });
+
+test("what's hot: Korean chili powder is gochugaru, kimchi gets rinsed, plain chili powder and paprika aren't hot", () => {
+  for (const line of ["2 tbsp gochugaru (Korean chili powder)", "1 tbsp Korean chili powder", "1 tsp red chili powder"]) {
+    assert.equal(isChiliLine(line), true, line);
+    assert.equal(spiceLine(line, "mild").off, true, line);
+  }
+  assert.equal(spiceLine("2 tbsp hot pepper paste", "mild").line, "1 tbsp hot pepper paste (half for mild)");
+  assert.equal(spiceLine("1 1/2 cups kimchi, chopped", "mild").line, "1 1/2 cups kimchi, chopped (rinse it in water for mild)");
+  assert.equal(spiceLine("1 1/2 cups kimchi, chopped", "spicy").line, "1 1/2 cups kimchi, chopped", "more kimchi isn't more heat");
+  assert.match(spiceLine("1 package Shin ramyun", "mild").line, /half the soup packet/);
+  for (const line of ["1/4 cup kimchi juice", "1 cup white kimchi", "Kimchi:"]) assert.equal(spiceLine(line, "mild").line, line, line);
+});
+
+test("healthy swaps know the dish: glazes keep their sugar, baking takes a quarter less, kimbap keeps sticky rice", () => {
+  const glazed = cookedLines({ name: "Sweet Crispy Chicken (Dakgangjeong)", categories: ["korean"], ingredients: ["3 tbsp brown sugar"] }, { healthy: true });
+  assert.equal(glazed.lines[0].line, "3 tbsp brown sugar");
+  const glazeSection = cookedLines({ name: "Wings", categories: [], ingredients: ["1 tbsp sugar", "Glaze:", "2 tbsp honey"] }, { healthy: true });
+  assert.deepEqual(glazeSection.lines.map((l) => l.line), ["½ tbsp sugar (half the usual)", "Glaze:", "2 tbsp honey"]);
+  const muffins = cookedLines({ name: "Muffins", categories: [], ingredients: ["1 cup sugar", "2 tsp baking powder"] }, { healthy: true });
+  assert.equal(muffins.lines[0].line, "¾ cup sugar (a quarter less)");
+  const kimbap = cookedLines({ name: "Kimbap", categories: ["korean"], ingredients: ["3 cups cooked rice"] }, { healthy: true });
+  assert.equal(kimbap.lines[0].line, "3 cups cooked rice");
+  // Pan-frying in a little oil isn't deep-frying.
+  assert.equal(healthierLine("2 tbsp vegetable oil, plus more for frying"), null);
+  assert.equal(healthierLine("4 cups vegetable oil, for frying").label, "air-fried");
+});
+
+test("step notes: the air-fry way on frying steps, and when to scoop out a mild share", () => {
+  const dish = {
+    name: "Corn dogs", categories: [], ingredients: ["4 cups oil, for frying", "1 tbsp gochugaru"],
+    steps: ["Mix the batter.", "Heat the oil to 350°F and fry 2 at a time.", "Sprinkle the gochugaru on top."],
+  };
+  const notes = cookedLines(dish, { healthy: true, spice: "medium", mildFor: ["Mina"] }).stepNotes;
+  assert.equal(notes[0], "");
+  assert.match(notes[1], /air-fry at 400°F/);
+  assert.equal(notes[2], "😊 Scoop out a mild share for Mina before the chili goes in.");
+  assert.match(cookedLines(dish, { spice: "mild" }).stepNotes[2], /^😊 Mild/);
+  assert.match(cookedLines({ ...dish, mildTip: "Kids' version: soy sauce." }, { spice: "mild" }).tips[0], /Kids' version/);
+});
+
+test("what we have only covers the same food: onion isn't green onion, chicken isn't chicken broth", () => {
+  for (const [have, need] of [["onion", "green onion"], ["potato", "sweet potato"], ["potato", "sweet potato glass noodle"], ["chicken", "chicken bouillon"],
+    ["egg", "egg noodle"], ["fish", "fish cake"], ["tomato", "tomato paste"], ["beef", "beef broth"], ["rice", "brown rice"], ["red onion", "onion"]]) {
+    assert.equal(haveCovers(have, need), false, `${have} → ${need}`);
+  }
+  for (const [have, need] of [["onion", "yellow onion"], ["chicken", "chicken thigh"], ["egg", "egg yolk"], ["tomato", "cherry tomato"], ["beef", "ground beef"],
+    ["beef", "ribeye"], ["pork", "pork belly"], ["tofu", "firm tofu"], ["mushroom", "shiitake mushroom"], ["cheese", "mozzarella"]]) {
+    assert.equal(haveCovers(have, need), true, `${have} → ${need}`);
+  }
+});
+
+test("rice syrup and rice cereal aren't rice on the shopping list", () => {
+  const list = buildGroceryList([{ dish: { name: "A", servings: 4, ingredients: ["1/3 cup rice syrup", "2 cups rice", "1 cup rice krispies", "1 cup glutinous rice"] }, servings: 4 }]);
+  assert.deepEqual(list.map((i) => `${i.name}: ${i.amount}`).sort(), ["Glutinous rice: 1 cup", "Rice krispies: 1 cup", "Rice syrup: ⅓ cup", "Rice: 2 cups"]);
+  assert.equal(list.find((i) => i.name === "Rice syrup").aisle, "asian");
+  assert.equal(normalizeItemName("cooked short-grain rice"), "rice");
+});

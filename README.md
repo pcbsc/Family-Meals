@@ -5,26 +5,45 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
 7-year-old: big pictures, big buttons, very little reading.
 
 - **Today**: what's for breakfast, lunch, dinner and snack. When a grown-up sets out
-  2–3 choices, the kids pick tonight's dinner. Rate last night's dinner with faces 😍 😋 😐 😖.
-  Every planned meal has a **🔄 Change** button.
+  2–3 choices, the kids pick tonight's dinner. Every planned meal has a **🔄 Change** button
+  (with a grown-up PIN, kids get **🙋 Ask for something else** instead, so a dinner that's
+  already shopped for doesn't change). After dinner, **🍽️ We ate it!** opens one sheet:
+  faces 😍 😋 😐 😖 for everyone, Brave Bites stickers, what got used up, leftovers for
+  tomorrow's lunch or the freezer, and a note for next time ("less sugar"), which shows on
+  the recipe the next time you make it.
 - **Changing your mind is one tap**: tap a meal spot (or 🔄 Change) and pick one of four
   **🔄 Try something else** ideas (🎲 for more), **📆 Move it to another day** (it swaps with
   what's there), **🍱 Make extra for lunch tomorrow**, or use a **🧊 freezer meal**. Every
-  change shows an **Undo** button. An empty week offers **📋 Same as last week**.
+  change shows an **Undo** button, including filling, copying, Claude's plan and clearing
+  the week. A dinner cooked double takes its leftover lunch along when it moves, and takes it
+  off when it's removed. An empty week offers **📋 Same as last week**. **📅 Plan it** on a
+  recipe asks whether to have it instead of what's planned, or add it as a side.
 - **Week**: plan seven days. Tap a spot to pick a dish, add sides, or let the kids choose.
   **✨ Fill our week** offers two choices: **Use our favorites** fills the empty spots from
-  the dishes the family rates highest; **Ask Claude** builds a balanced, healthy week and finds new recipes from
-  Seonkyoung Longest and other well-known cooks.
+  the dishes the family rates highest, and keeps the week balanced: one noodle and one fried
+  dinner at most, a different protein each night, fish when there's a fish dish, 40 minutes or
+  less on school nights, and a banchan with each Korean dinner. **Ask Claude** builds a
+  balanced, healthy week (using what's in the fridge and freezer, and everyone's allergies and
+  dislikes) and finds new recipes from Seonkyoung Longest and other well-known cooks.
 - **Menu**: all our dishes as picture tiles. Swipe the flag buttons to see one kind of food
   (🇰🇷 Korean, 🇺🇸 American, 🇮🇹 Italian, 🇲🇽 Mexican, 🇨🇳 Chinese, 🇯🇵 Japanese, 🇮🇳 Indian,
   🇹🇭 Thai, 🫒 Mediterranean). Each dish has servings you can change (the ingredients
   rescale), steps, tips, food photos, hearts and everyone's faces.
-  **👩‍🍳 Cook together** shows one big step at a time, with timers and read-aloud.
-- **🥗 Healthy · 🌶️ how spicy · ⚖️ cups or grams**: three switches on every recipe (and in
-  Settings) that change the ingredients, steps and shopping list. Healthy swaps in brown rice,
-  low-sodium soy sauce, whole-wheat pasta and bread, lean meat and less sugar, and air-frying
-  instead of deep-frying, plus each new dish's own tip. **Mild** leaves out chili flakes and
-  fresh chilies and halves the gochujang; **Spicy** adds more, for kids who love it hot.
+  **👩‍🍳 Cook together** shows one big step at a time with the amounts that step uses, a
+  **🧒 Your job** for the kids (rinse, crack eggs, snip green onions, roll kimbap, fill mandu,
+  sprinkle, be the timer captain…), a grown-up badge only for knives, the stove and the oven,
+  read-aloud, and several timers at once (the rice keeps going while the next step's timer
+  runs). 🔊 next to a Korean name says it in Korean.
+- **🥗 Healthy · 🌶️ how spicy · ⚖️ cups or grams**: switches that change the ingredients,
+  steps and shopping list. Settings sets the family's way; on a recipe, Healthy and spice are
+  just for that recipe (so a kid trying 🔥 Spicy on one dish doesn't change them all). Healthy
+  swaps in brown rice (not for kimbap, which needs sticky rice), low-sodium soy sauce,
+  whole-wheat pasta and bread, lean meat and less sugar (a quarter less in baking, none taken
+  from a glaze), and air-frying instead of deep-frying, with the frying steps rewritten.
+  **Mild** leaves out gochugaru and fresh chilies, halves the gochujang, rinses the kimchi and
+  uses half the spicy ramen packet; the spiciest dishes (tteokbokki, jeyuk, dakdoritang…) say
+  how to make the kids' soy-sauce version. **Spicy** adds more, for kids who love it hot. If
+  one person likes it mild, the steps say when to scoop out their share.
   Grams turns cups, pounds, ounces, °F and inches into grams, ml, °C and cm.
   **🖨️ Print recipe card** prints just the recipe.
 - **🧊 What can we make?** (top of the Menu): tap or type what's in the fridge. It shows the
@@ -34,20 +53,31 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
   with **🛒 Add to shopping list** on its page. The same ingredient from different dishes is
   one line, with the total amount and which dishes it's for, sorted by aisle (including an Asian-market
   aisle), with the cupboard basics folded away. Tick things off, or send the list to a phone.
-  Things we already have are set aside under **✅ We have these**; **🏠 Done shopping** puts
-  everything ticked into "what we have", and after cooking you tap what got used up.
-  Leftover lunches and freezer meals aren't shopped for twice.
+  Things we already have are set aside under **✅ We have these** (with the day we got them);
+  **🏠 Done shopping** puts everything ticked into "what we have", and after cooking you tap
+  what got used up. Fresh food (veggies, meat, eggs, milk) goes back on the list after a week
+  unless you say it's still there; onions don't count as green onions, nor chicken as chicken
+  broth. Things you type in are sorted into their aisle. Leftover lunches and freezer meals
+  aren't shopped for twice.
 - **📱 Shared shopping list** (optional): both grown-ups' phones tick the same list, live.
   See [Shared shopping list](#shared-shopping-list) below.
-- **🏅 Brave Bites**: a sticker chart for trying new foods. Each new dish a kid tries and rates
-  earns a sticker; ten stickers and they pick a dinner.
+- **🏅 Brave Bites**: a sticker chart for trying foods. Kids learn to like a food by tasting it
+  again and again (in studies, about a dozen tiny tastes, each with a sticker). So a grown-up
+  picks one or two **Brave Foods** per kid, and every try earns an animal sticker, up to 12 per
+  food. A dish tried for the very first time earns one too. Ten stickers and **🏆 they pick a
+  dinner**.
+- **🍽️ Food for each person** (Settings → 🍽️ next to a name): allergies, dislikes, how spicy,
+  and foods they always eat. A dish with an allergy gets a red warning (sauces count: soy
+  sauce and gochujang have wheat and soy), and the fill buttons, ideas, the kids' wish screen
+  and Claude never pick it. A dislike says to serve it on the side.
 - **📆 Calendar**: Week → ⋯ → **Put our dinners on the calendar** makes a calendar file that
   Google Calendar, Apple Calendar or Outlook can add.
 - **Add a dish**: paste a link (recipe sites, Instagram, TikTok, YouTube), snap a photo
   of a cookbook page or a screenshot, paste a caption, or write our own.
 - **📺 Videos**: a dish can have a YouTube, TikTok or Instagram video. It plays right on the
   dish page, and in **Cook together** the 📺 button keeps it above the steps while you cook.
-- **🙋 I want to eat…**: kids make wishes, and the grown-ups see them when planning.
+- **🙋 I want to eat…**: kids make wishes from a dozen big pictures (or say it with 🎤 where
+  the browser can listen), and the grown-ups see them when planning.
 
 It starts with 152 family recipes, 148 of them with a cooking video. Most are Korean and
 Korean-American: 66 Korean dishes (bulgogi, japchae, tteokbokki, rosé tteokbokki, dakgangjeong,

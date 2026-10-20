@@ -1,9 +1,11 @@
 // What can we make? Tap or type what's in the fridge, and see which dishes are
 // ready to cook and which need just a thing or two (those go on the list).
 // The freezer list is here too: meals we froze for a busy night.
-import { h, clearChildren, toast } from "../ui.js";
+import { h, clearChildren, toast, prettyDate } from "../ui.js";
 import { whatCanIMake, keyIngredients, normalizeItemName } from "../recipe.js";
-import { state, dishList, saveSettings, go, addShoppingExtras, freezer, addToFreezer, takeFromFreezer } from "../store.js";
+import {
+  state, dishList, go, addShoppingExtras, freezer, addToFreezer, takeFromFreezer, haveItems, addHave, removeHave, FRESH_DAYS,
+} from "../store.js";
 import { backHeader, dishTile, dishArt, planItSheet, pickDishes } from "../components.js";
 
 const COMMON = [
@@ -15,27 +17,23 @@ const COMMON = [
 ];
 const emojiFor = (item) => COMMON.find(([, name]) => normalizeItemName(name) === normalizeItemName(item))?.[0] || "🧺";
 
+/** "Tue" this week, "Oct 12" before. */
+const dayText = (at) => prettyDate(new Date(at), Date.now() - at < 6 * 24 * 3600 * 1000 ? { weekday: "short" } : { month: "short", day: "numeric" });
+
 export function viewFridge() {
-  let have = [...(state.settings.have || [])];
-  const haveBox = h("div.row.wrap.have-list");
+  const haveBox = h("div.stack.have-list");
   const quick = h("div.row.wrap");
   const results = h("div.stack");
 
-  const keep = async (next) => {
-    have = next;
-    await saveSettings({ have });
+  const startOver = h("button.btn.ghost.center-btn", { onclick: async () => { await removeHave(() => true); draw(); } }, "Start over");
+  const add = async (text) => {
+    const fresh = String(text).split(/[,\n]/).map((t) => t.trim().toLowerCase()).filter((t) => t && t.length <= 40);
+    await addHave(fresh, { max: 60 });
     draw();
   };
-  const add = (text) => {
-    const known = new Set(have.map(normalizeItemName));
-    const fresh = String(text).split(/[,\n]/).map((t) => t.trim().toLowerCase()).filter((t) => t && t.length <= 40);
-    const next = [...have];
-    for (const t of fresh) {
-      if (known.has(normalizeItemName(t))) continue;
-      known.add(normalizeItemName(t));
-      next.push(t);
-    }
-    return keep(next.slice(0, 60));
+  const drop = async (item) => {
+    await removeHave((name) => name === item.name);
+    draw();
   };
 
   // Suggestions while typing: everything our dishes use.
@@ -53,17 +51,33 @@ export function viewFridge() {
     clearChildren(haveBox);
     clearChildren(quick);
     clearChildren(results);
-    if (have.length) {
-      for (const item of have) {
-        haveBox.append(h("button.have-chip", {
-          "aria-label": `Remove ${item}`,
-          onclick: () => keep(have.filter((x) => x !== item)),
-        }, emojiFor(item), " ", item, h("span.have-x", "✕")));
-      }
-    } else {
+    const items = haveItems();
+    const fresh = items.filter((x) => !x.stale);
+    const stale = items.filter((x) => x.stale);
+    const have = fresh.map((x) => x.name);
+    startOver.hidden = !items.length;
+    if (fresh.length) {
+      haveBox.append(h("div.row.wrap", fresh.map((item) => h("button.have-chip", {
+        "aria-label": `Remove ${item.name}`,
+        onclick: () => drop(item),
+      }, emojiFor(item.name), " ", item.name, item.at ? h("span.have-when", dayText(item.at)) : null, h("span.have-x", "✕")))));
+    } else if (!stale.length) {
       haveBox.append(h("p.muted", "Nothing yet. Tap the foods below, or type them."));
     }
-    const known = new Set(have.map(normalizeItemName));
+    // Fresh food bought over a week ago: still here? Until someone says so, it goes back on the list.
+    if (stale.length) {
+      haveBox.append(h("div.stale-have",
+        h("p.muted.small", `Still have these? We got them more than ${FRESH_DAYS} days ago. Tap the ones that are still here.`),
+        h("div.row.wrap", stale.map((item) => h("span.stale-chip",
+          h("button.have-chip.stale", {
+            "aria-label": `We still have ${item.name}`,
+            onclick: async () => { await addHave([item.name]); draw(); },
+          }, emojiFor(item.name), " ", item.name, h("span.have-when", dayText(item.at)), h("span.have-ok", "✓")),
+          h("button.icon-btn.small", { "aria-label": `${item.name} is gone`, onclick: () => drop(item) }, "✕"),
+        ))),
+      ));
+    }
+    const known = new Set(items.map((x) => x.key));
     for (const [emoji, name] of COMMON) {
       if (known.has(normalizeItemName(name))) continue;
       quick.append(h("button.chip", { onclick: () => add(name) }, `${emoji} ${name}`));
@@ -152,7 +166,7 @@ export function viewFridge() {
       h("div.row", input, h("button.btn.primary", { "aria-label": "Add", onclick: addTyped }, "➕")),
       h("datalist#fridge-words", [...words].sort().map((w) => h("option", { value: w }))),
       quick,
-      have.length ? h("button.btn.ghost.center-btn", { onclick: () => keep([]) }, "Start over") : null,
+      startOver,
     ),
     results,
     freezerBox,

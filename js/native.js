@@ -54,10 +54,10 @@ if (plugin("Share")) {
 }
 
 /** Reads text aloud with Android's voice. Returns false when there's no app voice. */
-export function appSpeak(text) {
+export function appSpeak(text, lang = "en-US") {
   const tts = plugin("TextToSpeech");
   if (!tts) return false;
-  tts.stop().catch(() => {}).finally(() => tts.speak({ text, lang: "en-US", rate: 0.92 }).catch(() => {}));
+  tts.stop().catch(() => {}).finally(() => tts.speak({ text, lang, rate: 0.92 }).catch(() => {}));
   return true;
 }
 

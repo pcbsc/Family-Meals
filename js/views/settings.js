@@ -1,6 +1,6 @@
 // Settings (grown-ups only, behind the PIN if one is set) and the first-run
 // welcome that sets up the family and the starter menu.
-import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti, once } from "../ui.js";
+import { h, toast, confirmSheet, downloadFile, clearChildren, openSheet, confetti, once, unlockGrownUp } from "../ui.js";
 import { dateKey } from "../planner.js";
 import { MEALS, AVATARS, STARTER_DISHES, LATEST_STARTER_BATCH } from "../seed.js";
 import { SPICE_LEVELS } from "../recipe.js";
@@ -167,6 +167,56 @@ function avatarPicker(current, onPick) {
   { title: "Pick a face" });
 }
 
+/**
+ * Someone's food: allergies (warned about everywhere, never picked by the
+ * fill buttons or Claude), dislikes, how spicy, and foods they always eat.
+ */
+function foodSheet(member, onSaved) {
+  const m = { ...member };
+  openSheet((close) => {
+    const spiceRow = h("div.segmented", { role: "group", "aria-label": "How spicy" });
+    const drawSpice = () => {
+      clearChildren(spiceRow);
+      for (const [key, label] of [["", "Family way"], ["mild", "😊 Mild"], ["medium", "🌶️ Medium"], ["spicy", "🔥 Spicy"]]) {
+        spiceRow.append(h(`button.seg${(m.spice || "") === key ? ".on" : ""}`, {
+          "aria-pressed": String((m.spice || "") === key),
+          onclick: () => { m.spice = key; drawSpice(); },
+        }, label));
+      }
+    };
+    drawSpice();
+    const field = (key, label, placeholder) => [
+      h("label.field-label", { for: `food-${key}` }, label),
+      h(`input.text#food-${key}`, { value: m[key] || "", placeholder, maxlength: 160, oninput: (e) => (m[key] = e.target.value) }),
+    ];
+    return h("div.stack",
+      ...field("allergies", "⚠️ Allergies", "Like: peanuts, egg, shellfish"),
+      h("p.muted.small", "Dishes with these get a red warning, and \"Fill our week\", the ideas and Claude never pick them. Sauces count too: soy sauce and gochujang have wheat and soy."),
+      ...field("dislikes", "🙅 Doesn't like", "Like: mushrooms, cilantro"),
+      ...field("safeFoods", "😋 Always eats", "Like: rice, eggs, cucumber"),
+      h("p.muted.small", "Brave Bites suggests serving these next to a new food."),
+      h("label.field-label", "🌶️ How spicy"),
+      spiceRow,
+      h("p.muted.small", "Mild for someone in a spicy family? Cook-along says when to scoop out their share."),
+      h("button.btn.primary.wide", {
+        onclick: async () => {
+          const clean = (t) => String(t || "").split(/[,;\n]/).map((x) => x.trim()).filter(Boolean).join(", ");
+          const patch = { allergies: clean(m.allergies), dislikes: clean(m.dislikes), safeFoods: clean(m.safeFoods), spice: m.spice || "" };
+          await saveSettings({ members: state.settings.members.map((x) => (x.id === member.id ? { ...x, ...patch } : x)) });
+          await close();
+          onSaved?.();
+        },
+      }, "Save"),
+    );
+  }, { title: `🍽️ ${member.name}'s food` });
+}
+
+/** "⚠️ peanuts · 🙅 mushrooms · 😊 mild" under someone's name. */
+function foodSummary(m) {
+  const bits = [m.allergies && `⚠️ ${m.allergies}`, m.dislikes && `🙅 ${m.dislikes}`, m.spice && { mild: "😊 mild", medium: "🌶️ medium", spicy: "🔥 spicy" }[m.spice]].filter(Boolean);
+  return bits.length ? h("p.muted.small.food-summary", bits.join(" · ")) : null;
+}
+
 function familyEditor({ onChange } = {}) {
   const wrap = h("div.stack");
   const draw = () => {
@@ -183,6 +233,7 @@ function familyEditor({ onChange } = {}) {
           h("span.avatar.lg", m.avatar)),
         h("input.text.grow", { value: m.name, "aria-label": "Name", placeholder: "Name", onchange: (e) => update({ name: e.target.value.trim() || "Someone" }) }),
         h(`button.chip${m.kid ? ".on" : ""}`, { onclick: async () => { await update({ kid: !m.kid }); draw(); } }, m.kid ? "🧒 Kid" : "🧑 Grown-up"),
+        h("button.icon-btn", { "aria-label": `${m.name}'s food: allergies, likes, spice`, onclick: () => foodSheet(m, () => { onChange?.(); draw(); }) }, "🍽️"),
         h("button.icon-btn", {
           "aria-label": `Remove ${m.name}`,
           onclick: async () => {
@@ -191,7 +242,7 @@ function familyEditor({ onChange } = {}) {
             draw();
           },
         }, "✕"),
-      ));
+      ), ...[foodSummary(m)].filter(Boolean));
     });
     wrap.append(h("button.btn.soft", {
       onclick: async () => {
@@ -218,6 +269,8 @@ function pinSheet() {
         onclick: async () => {
           if (pin.length !== 4) return toast("Use exactly 4 numbers.", { emoji: "🔢" });
           await saveSettings({ pin });
+          // They just typed it: setting a PIN shouldn't lock them out of the screen they're on.
+          unlockGrownUp();
           await close();
           toast("PIN saved. Don't forget it!", { emoji: "🔒" });
           refresh();
@@ -430,7 +483,7 @@ export function viewWelcome() {
     const finish = async (withStarters) => {
       const people = state.settings.members.length;
       await saveSettings({
-        onboarded: true, onboardedAt: Date.now(), starterBatch: LATEST_STARTER_BATCH,
+        onboarded: true, onboardedAt: Date.now(), starterBatch: LATEST_STARTER_BATCH, braveTries: state.settings.braveTries || [],
         servings: people >= 2 ? people : state.settings.servings,
       });
       if (withStarters) await addStarterDishes();

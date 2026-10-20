@@ -45,6 +45,18 @@ export const CUISINES = [
 
 export const SPICE = ["Not spicy", "A little spicy", "Spicy"];
 
+// For the spiciest starters, halving the gochujang still isn't mild: how Korean
+// families make a kids' version instead. Shown when the recipe is set to Mild.
+export const MILD_TIPS = {
+  "tteokbokki": "Kids' version: make gungjung (soy sauce) tteokbokki. Leave out the gochujang and gochugaru, and use 3 tbsp soy sauce, 1 tbsp sugar and 1 tsp sesame oil instead. Everything else stays the same.",
+  "rabokki": "Kids' version: leave out the gochujang and gochugaru and use 3 tbsp soy sauce, 1 tbsp sugar and a little sesame oil. The cheese on top makes it extra kid-friendly.",
+  "kimchi-jjigae": "Kids' version: rinse the kimchi, leave out the gochugaru and use half the gochujang. A spoonful of sugar and extra tofu keep it rich.",
+  "budae-jjigae": "Kids' version: leave out the gochugaru and use half the gochujang. Ladle the kids' bowls first and top them with the cheese.",
+  "jeyuk-bokkeum": "Kids' version: make ganjang (soy sauce) jeyuk. Leave out the gochujang and gochugaru and use 4 tbsp soy sauce, 2 tbsp sugar, the garlic and ginger instead.",
+  "dakdoritang": "Kids' version: make it with soy sauce, like jjimdak. Leave out the gochugaru and gochujang and use 6 tbsp soy sauce and 3 tbsp sugar, with the same potatoes and carrots.",
+  "bibim-guksu": "Kids' version: toss the kids' noodles with soy sauce, sesame oil, a little sugar and vinegar first, then mix the gochujang sauce into everyone else's.",
+};
+
 export const FACES = [
   { score: 4, emoji: "😍", label: "Love it!" },
   { score: 3, emoji: "😋", label: "Yummy" },
