@@ -3,6 +3,7 @@
 // menu on day one. Discover links to recipes by well-known cooks; tapping one
 // asks Claude to read that page and add it to the menu on this device.
 import { FUSION_STARTERS } from "./seed-fusion.js";
+import { MORE_KOREAN_STARTERS } from "./seed-more.js";
 
 export const MEALS = [
   { key: "breakfast", label: "Breakfast", emoji: "🌅", color: "#FFE7A3" },
@@ -54,6 +55,8 @@ export const MILD_TIPS = {
   "budae-jjigae": "Kids' version: leave out the gochugaru and use half the gochujang. Ladle the kids' bowls first and top them with the cheese.",
   "jeyuk-bokkeum": "Kids' version: make ganjang (soy sauce) jeyuk. Leave out the gochujang and gochugaru and use 4 tbsp soy sauce, 2 tbsp sugar, the garlic and ginger instead.",
   "dakdoritang": "Kids' version: make it with soy sauce, like jjimdak. Leave out the gochugaru and gochujang and use 6 tbsp soy sauce and 3 tbsp sugar, with the same potatoes and carrots.",
+  "sundubu-jjigae": "Kids' version: leave out the gochugaru and kimchi and make a white sundubu: season with soy sauce and a little salted shrimp or salt. The egg on top stays.",
+  "dak-galbi": "Kids' version: make ganjang (soy sauce) dak galbi. Leave out the gochujang and gochugaru and use 4 tbsp soy sauce, 2 tbsp honey and the garlic and ginger.",
   "bibim-guksu": "Kids' version: toss the kids' noodles with soy sauce, sesame oil, a little sugar and vinegar first, then mix the gochujang sauce into everyone else's.",
 };
 
@@ -812,12 +815,13 @@ export const STARTER_DISHES = [
   ...MORE_STARTERS.map((dish) => ({ ...dish, batch: 2 })),
   ...WORLD_STARTERS.map((dish) => ({ ...dish, batch: 3 })),
   ...FUSION_STARTERS.map((dish) => ({ ...dish, batch: 4 })),
+  ...MORE_KOREAN_STARTERS.map((dish) => ({ ...dish, batch: 5 })),
 ].map((dish) => ({
   ...dish,
   cuisine: dish.cuisine || STARTER_CUISINES[dish.seedKey] || (dish.categories.includes("korean") ? "korean" : "american"),
   videoUrl: STARTER_VIDEOS[dish.seedKey] || "",
 }));
-export const LATEST_STARTER_BATCH = 4;
+export const LATEST_STARTER_BATCH = 5;
 
 const CUISINE_KEYS = new Set(CUISINES.map((c) => c.key));
 const SEED_CUISINE = new Map(STARTER_DISHES.map((dish) => [dish.seedKey, dish.cuisine]));

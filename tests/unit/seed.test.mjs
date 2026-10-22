@@ -63,12 +63,15 @@ test("a family who has the first starters gets the new ones once", () => {
   const fresh = startersToAdd({ starterBatch: undefined, haveSeedKeys: first });
   assert.equal(fresh.length, STARTER_DISHES.filter((d) => d.batch > 1).length);
   assert.ok(fresh.every((d) => d.batch > 1));
-  // A family that joined at batch 2 gets batches 3 and 4; one at batch 3 gets just batch 4.
+  // A family that joined at batch 2 gets batches 3 to 5; one at batch 3 gets 4 and 5; one at batch 4 gets just batch 5.
   const two = new Set(STARTER_DISHES.filter((d) => d.batch <= 2).map((d) => d.seedKey));
   assert.ok(startersToAdd({ starterBatch: 2, haveSeedKeys: two }).every((d) => d.batch >= 3));
   const three = new Set(STARTER_DISHES.filter((d) => d.batch <= 3).map((d) => d.seedKey));
   const four = startersToAdd({ starterBatch: 3, haveSeedKeys: three });
-  assert.ok(four.length >= 30 && four.every((d) => d.batch === 4));
+  assert.ok(four.length >= 50 && four.every((d) => d.batch === 4 || d.batch === 5));
+  const upToFour = new Set(STARTER_DISHES.filter((d) => d.batch <= 4).map((d) => d.seedKey));
+  const five = startersToAdd({ starterBatch: 4, haveSeedKeys: upToFour });
+  assert.ok(five.length >= 20 && five.every((d) => d.batch === 5));
   // Already up to date: nothing.
   assert.equal(startersToAdd({ starterBatch: LATEST_STARTER_BATCH, haveSeedKeys: first }).length, 0);
 });

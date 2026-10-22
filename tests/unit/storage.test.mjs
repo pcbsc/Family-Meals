@@ -107,7 +107,7 @@ test("nearly every ingredient in the starter recipes is in the guide", () => {
       const p = parseIngredient(line);
       if (p.header || !p.item) continue;
       total++;
-      if (!foodFor(p.item) && !/\b(salt|sugar|water|ice|skewers?|vanilla|baking|yeast|starch|cornstarch|panko|breadcrumbs|oats|raisins?|granola|juice|jujubes?|ginseng|mirin|chips|dough|sun-dried|dried shiitake|sesame oil|wakame|dried seaweed|perilla)\b/i.test(p.item)) {
+      if (!foodFor(p.item) && !/\b(salt|sugar|water|ice|skewers?|vanilla|baking|yeast|starch|cornstarch|panko|breadcrumbs|oats|raisins?|granola|juice|jujubes?|ginseng|mirin|chips|dough|sun-dried|dried shiitake|sesame oil|wakame|dried seaweed|perilla|pancake mix|furikake|coffee|kabocha|soy milk)\b/i.test(p.item)) {
         missing.set(p.item, (missing.get(p.item) || 0) + 1);
       }
     }
