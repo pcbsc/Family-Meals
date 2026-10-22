@@ -149,7 +149,14 @@ async function start() {
       await putSharedItem(item);
       go(`#/add?shared=1&n=${Date.now()}`);
     });
-  } else if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
+  } else if ("serviceWorker" in navigator) {
+    // A new version installs in the background; offer it instead of reloading mid-recipe.
+    const hadOne = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadOne) toast("Family Menu has an update.", { emoji: "✨", ms: 20000, action: { label: "Refresh", onclick: () => location.reload() } });
+    });
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
 }
 
 start();
