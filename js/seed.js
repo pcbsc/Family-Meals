@@ -5,6 +5,8 @@
 import { FUSION_STARTERS } from "./seed-fusion.js";
 import { MORE_KOREAN_STARTERS } from "./seed-more.js";
 import { FAMILY_STARTERS } from "./seed-family.js";
+import { EVERYDAY_STARTERS } from "./seed-everyday.js";
+import { DINNER_STARTERS } from "./seed-dinners.js";
 
 export const MEALS = [
   { key: "breakfast", label: "Breakfast", emoji: "🌅", color: "#FFE7A3" },
@@ -819,12 +821,13 @@ export const STARTER_DISHES = [
   ...FUSION_STARTERS.map((dish) => ({ ...dish, batch: 4 })),
   ...MORE_KOREAN_STARTERS.map((dish) => ({ ...dish, batch: 5 })),
   ...FAMILY_STARTERS.map((dish) => ({ ...dish, batch: 6 })),
+  ...[...EVERYDAY_STARTERS, ...DINNER_STARTERS].map((dish) => ({ ...dish, batch: 7 })),
 ].map((dish) => ({
   ...dish,
   cuisine: dish.cuisine || STARTER_CUISINES[dish.seedKey] || (dish.categories.includes("korean") ? "korean" : "american"),
   videoUrl: STARTER_VIDEOS[dish.seedKey] || "",
 }));
-export const LATEST_STARTER_BATCH = 6;
+export const LATEST_STARTER_BATCH = 7;
 
 const CUISINE_KEYS = new Set(CUISINES.map((c) => c.key));
 const SEED_CUISINE = new Map(STARTER_DISHES.map((dish) => [dish.seedKey, dish.cuisine]));

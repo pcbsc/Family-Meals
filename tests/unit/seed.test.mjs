@@ -71,10 +71,14 @@ test("a family who has the first starters gets the new ones once", () => {
   assert.ok(four.length >= 50 && four.every((d) => d.batch >= 4));
   const upToFour = new Set(STARTER_DISHES.filter((d) => d.batch <= 4).map((d) => d.seedKey));
   const five = startersToAdd({ starterBatch: 4, haveSeedKeys: upToFour });
-  assert.ok(five.length >= 40 && five.every((d) => d.batch === 5 || d.batch === 6));
+  assert.ok(five.length >= 40 && five.every((d) => d.batch >= 5));
   const upToFive = new Set(STARTER_DISHES.filter((d) => d.batch <= 5).map((d) => d.seedKey));
   const six = startersToAdd({ starterBatch: 5, haveSeedKeys: upToFive });
-  assert.ok(six.length >= 25 && six.every((d) => d.batch === 6));
+  assert.ok(six.length >= 25 && six.every((d) => d.batch >= 6));
+  const upToSix = new Set(STARTER_DISHES.filter((d) => d.batch <= 6).map((d) => d.seedKey));
+  const seven = startersToAdd({ starterBatch: 6, haveSeedKeys: upToSix });
+  assert.equal(seven.length, 100);
+  assert.ok(seven.every((d) => d.batch === 7));
   // Already up to date: nothing.
   assert.equal(startersToAdd({ starterBatch: LATEST_STARTER_BATCH, haveSeedKeys: first }).length, 0);
 });
