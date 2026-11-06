@@ -4,6 +4,7 @@
 // asks Claude to read that page and add it to the menu on this device.
 import { FUSION_STARTERS } from "./seed-fusion.js";
 import { MORE_KOREAN_STARTERS } from "./seed-more.js";
+import { FAMILY_STARTERS } from "./seed-family.js";
 
 export const MEALS = [
   { key: "breakfast", label: "Breakfast", emoji: "🌅", color: "#FFE7A3" },
@@ -57,6 +58,7 @@ export const MILD_TIPS = {
   "dakdoritang": "Kids' version: make it with soy sauce, like jjimdak. Leave out the gochugaru and gochujang and use 6 tbsp soy sauce and 3 tbsp sugar, with the same potatoes and carrots.",
   "sundubu-jjigae": "Kids' version: leave out the gochugaru and kimchi and make a white sundubu: season with soy sauce and a little salted shrimp or salt. The egg on top stays.",
   "dak-galbi": "Kids' version: make ganjang (soy sauce) dak galbi. Leave out the gochujang and gochugaru and use 4 tbsp soy sauce, 2 tbsp honey and the garlic and ginger.",
+  "ojingeo-bokkeum": "Kids' version: make ganjang (soy sauce) ojingeo bokkeum. Leave out the gochujang and gochugaru and use 3 tbsp soy sauce, 1 tbsp sugar, the garlic and a little oyster sauce.",
   "bibim-guksu": "Kids' version: toss the kids' noodles with soy sauce, sesame oil, a little sugar and vinegar first, then mix the gochujang sauce into everyone else's.",
 };
 
@@ -816,12 +818,13 @@ export const STARTER_DISHES = [
   ...WORLD_STARTERS.map((dish) => ({ ...dish, batch: 3 })),
   ...FUSION_STARTERS.map((dish) => ({ ...dish, batch: 4 })),
   ...MORE_KOREAN_STARTERS.map((dish) => ({ ...dish, batch: 5 })),
+  ...FAMILY_STARTERS.map((dish) => ({ ...dish, batch: 6 })),
 ].map((dish) => ({
   ...dish,
   cuisine: dish.cuisine || STARTER_CUISINES[dish.seedKey] || (dish.categories.includes("korean") ? "korean" : "american"),
   videoUrl: STARTER_VIDEOS[dish.seedKey] || "",
 }));
-export const LATEST_STARTER_BATCH = 5;
+export const LATEST_STARTER_BATCH = 6;
 
 const CUISINE_KEYS = new Set(CUISINES.map((c) => c.key));
 const SEED_CUISINE = new Map(STARTER_DISHES.map((dish) => [dish.seedKey, dish.cuisine]));

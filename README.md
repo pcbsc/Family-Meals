@@ -89,13 +89,15 @@ plus a weekly meal plan and a shopping list that makes itself. Simple enough for
 - **🙋 I want to eat…**: kids make wishes from a dozen big pictures (or say it with 🎤 where
   the browser can listen), and the grown-ups see them when planning.
 
-It starts with 172 family recipes, 148 of them with a cooking video. Most are Korean and
-Korean-American: 80 Korean dishes (bulgogi, japchae, tteokbokki, rosé tteokbokki, dakgangjeong,
+It starts with 201 family recipes, 148 of them with a cooking video. Most are Korean and
+Korean-American: 86 Korean dishes (bulgogi, japchae, tteokbokki, rosé tteokbokki, dakgangjeong,
 budae jjigae, jjimdak, mandu, gyeran jjim, kimbap, sundubu jjigae, cheesy dak galbi, bossam,
 galbitang, jangjorim, egg bread, rice cake skewers, fish cake soup…), 16 Korean fusion favorites
 (bulgogi tacos, kimchi quesadillas, kimchi mac & cheese, Spam musubi, kimbap bake, kimchi omurice,
 Korean chicken sandwiches, bulgogi cheesesteaks, gochujang wings, gochujang
-salmon…), and 31 spicy dishes for kids who like the heat. There are also
+salmon…), and 34 spicy dishes for kids who like the heat. Plus 5-minute breakfasts and lunches
+(bagels and cream cheese, egg and cheese bagels, avocado toast, overnight oats, bagel pizzas, tuna
+sandwiches, sliders, Caesar wraps), 30-minute dinners, and snacks and treats. There are also
 American family dinners (turkey chili, mac & cheese, fish sticks, banana oat muffins…),
 Italian (lasagna, meatballs, minestrone, pesto pasta), Mexican (enchiladas, burrito bowls,
 tortilla soup, guacamole), Chinese (egg fried rice, beef & broccoli, potstickers, tomato &
